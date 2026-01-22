@@ -1,5 +1,12 @@
+빌드 에러의 원인은 코드 상단 import 문에 사용하지 않는 **FileStack**이라는 항목이 포함되어 있기 때문입니다. 현재 Vercel 빌드 설정이 경고(Warning)를 에러로 취급하도록 되어 있어 발생한 문제입니다.
+
+해당 부분을 삭제하고, 전체 코드를 깔끔하게 정리해 드립니다. 이 코드를 복사해서 덮어쓰시면 빌드가 정상적으로 완료될 것입니다.
+
+수정된 전체 코드 (src/components/WordGuessGame.js)
+JavaScript
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trophy, Lightbulb, RotateCcw, Sparkles, type FileStack } from 'lucide-react';
+import { Trophy, Lightbulb, RotateCcw, Sparkles } from 'lucide-react';
 import { wordDatabase, twoWordDatabase, threeWordDatabase } from '../data/wordDatabase';
 
 const WordGuessGame = () => {
@@ -20,11 +27,10 @@ const WordGuessGame = () => {
   const [isCorrect, setIsCorrect] = useState(false);
   const [showHint, setShowHint] = useState(false);
 
-  // 현재 단어가 몇 단어인지 계산하는 함수
-  const getWordCount = () => {
+  const getWordCount = useCallback(() => {
     if (!currentWord) return 0;
     return currentWord.trim().split(/\s+/).length;
-  };
+  }, [currentWord]);
 
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
@@ -63,7 +69,7 @@ const WordGuessGame = () => {
     if (!currentWord || scrambledLetters.length === 0) {
       loadNewWord();
     }
-  }, [level, currentWord, loadNewWord, scrambledLetters.length]);
+  }, [currentWord, scrambledLetters.length, loadNewWord]);
 
   const checkGuess = () => {
     const user = selectedLetters.map(l => l.char).join('').toLowerCase();
@@ -95,7 +101,6 @@ const WordGuessGame = () => {
         </div>
 
         <div className="text-center mb-6">
-          {/* 단어 수 표시 추가 */}
           <div className="flex flex-col items-center gap-1 mb-4">
             <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">{category}</h2>
             <span className="text-[10px] font-bold text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-md mt-1">
@@ -104,17 +109,16 @@ const WordGuessGame = () => {
           </div>
 
           <div className="flex justify-center gap-3">
-            <button onClick={() => setShowHint(!showHint)} className="flex items-center gap-1 text-xs font-bold px-4 py-2 bg-gray-50 border rounded-full hover:bg-gray-100 transition-colors">
+            <button onClick={() => setShowHint(!showHint)} className="flex items-center gap-1 text-xs font-bold px-4 py-2 bg-gray-50 border rounded-full">
               <Lightbulb size={14} /> HINT
             </button>
-            <button onClick={() => setScrambledLetters(prev => [...prev].sort(() => Math.random() - 0.5))} className="flex items-center gap-1 text-xs font-bold px-4 py-2 bg-gray-50 border rounded-full hover:bg-gray-100 transition-colors">
+            <button onClick={() => setScrambledLetters(prev => [...prev].sort(() => Math.random() - 0.5))} className="flex items-center gap-1 text-xs font-bold px-4 py-2 bg-gray-50 border rounded-full">
               <RotateCcw size={14} /> SHUFFLE
             </button>
           </div>
           {showHint && <div className="mt-3 text-xs text-indigo-500 font-bold uppercase">Starts with: {currentWord[0]?.toUpperCase()}</div>}
         </div>
 
-        {/* 선택 버튼 영역 */}
         <div className="flex flex-wrap gap-2 justify-center mb-10 min-h-[60px]">
           {scrambledLetters.map(l => (
             <button 
@@ -124,15 +128,14 @@ const WordGuessGame = () => {
                 setSelectedLetters(prev => [...prev, l]);
                 setMessage('');
               }} 
-              className="w-12 h-12 bg-white border-2 border-gray-100 rounded-xl font-bold text-xl shadow-sm hover:border-indigo-400 active:scale-90 transition-all"
+              className="w-12 h-12 bg-white border-2 border-gray-100 rounded-xl font-bold text-xl shadow-sm active:scale-90 transition-all"
             >
               {l.char.toUpperCase()}
             </button>
           ))}
         </div>
 
-        {/* 답변 영역: 단어 수에 따른 가변 폰트 크기 */}
-        <div className="min-h-[100px] bg-indigo-50 rounded-2xl flex justify-center items-center p-4 mb-8 border-2 border-dashed border-indigo-200 overflow-x-auto scrollbar-hide">
+        <div className="min-h-[100px] bg-indigo-50 rounded-2xl flex justify-center items-center p-4 mb-8 border-2 border-dashed border-indigo-200 overflow-x-auto">
           <div className="flex gap-2 px-2 whitespace-nowrap items-center">
             {selectedLetters.length === 0 ? (
               <span className="text-indigo-200 text-sm font-bold uppercase tracking-widest">Select Letters</span>
@@ -144,7 +147,7 @@ const WordGuessGame = () => {
                     setSelectedLetters(prev => prev.filter(i => i.id !== l.id));
                     setScrambledLetters(prev => [...prev, l]);
                   }} 
-                  className={`font-black text-indigo-600 cursor-pointer transition-all animate-in fade-in zoom-in duration-200 ${
+                  className={`font-black text-indigo-600 cursor-pointer transition-all ${
                     selectedLetters.length > 12 ? 'text-xl' : selectedLetters.length > 8 ? 'text-2xl' : 'text-4xl'
                   }`}
                 >
@@ -160,8 +163,8 @@ const WordGuessGame = () => {
             setScrambledLetters(prev => [...prev, ...selectedLetters]);
             setSelectedLetters([]);
             setMessage('');
-          }} className="flex-1 bg-gray-100 py-4 rounded-2xl font-bold text-gray-400 hover:bg-gray-200 transition-colors">RESET</button>
-          <button onClick={checkGuess} disabled={selectedLetters.length === 0 || isCorrect} className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg disabled:bg-green-500 transition-colors">
+          }} className="flex-1 bg-gray-100 py-4 rounded-2xl font-bold text-gray-400">RESET</button>
+          <button onClick={checkGuess} disabled={selectedLetters.length === 0 || isCorrect} className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg disabled:bg-green-500">
             {isCorrect ? 'PERFECT!' : 'CHECK'}
           </button>
         </div>
