@@ -60,14 +60,14 @@ const WordGuessGame = () => {
     const correct = currentWord.replace(/\s/g, '').toLowerCase();
 
     if (user === correct) {
-      setMessage('Excellent! 🎉');
+      setMessage('EXCELLENT! 🎉');
       setIsCorrect(true);
       setTimeout(() => {
         setCurrentWord('');
         setScore(s => s + (level * 10));
         setLevel(l => l + 1);
       }, 1500);
-    } else { setMessage('Try Again!'); }
+    } else { setMessage('TRY AGAIN!'); }
   };
 
   return (
@@ -83,7 +83,7 @@ const WordGuessGame = () => {
         </div>
 
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-black mb-4">{category}</h2>
+          <h2 className="text-2xl font-black mb-4 uppercase tracking-tighter">{category}</h2>
           <div className="flex justify-center gap-3">
             <button onClick={() => setShowHint(!showHint)} className="flex items-center gap-1 text-xs font-bold px-4 py-2 bg-gray-50 border rounded-full">
               <Lightbulb size={14} /> HINT
@@ -92,34 +92,46 @@ const WordGuessGame = () => {
               <RotateCcw size={14} /> SHUFFLE
             </button>
           </div>
-          {showHint && <div className="mt-3 text-xs text-indigo-500 font-bold">Starts with: {currentWord[0]?.toUpperCase()}</div>}
+          {showHint && <div className="mt-3 text-xs text-indigo-500 font-bold uppercase">Starts with: {currentWord[0]?.toUpperCase()}</div>}
         </div>
 
-        <div className="flex flex-wrap gap-2 justify-center mb-8 min-h-[60px]">
+        {/* 알파벳 선택 영역 */}
+        <div className="flex flex-wrap gap-2 justify-center mb-10 min-h-[60px]">
           {scrambledLetters.map(l => (
             <button key={l.id} onClick={() => {
               setScrambledLetters(prev => prev.filter(i => i.id !== l.id));
               setSelectedLetters(prev => [...prev, l]);
-            }} className="w-12 h-12 bg-white border-2 border-gray-100 rounded-xl font-bold text-xl shadow-sm active:scale-90">{l.char.toUpperCase()}</button>
+            }} className="w-11 h-11 bg-white border-2 border-gray-100 rounded-xl font-bold text-lg shadow-sm active:scale-90 transition-transform">{l.char.toUpperCase()}</button>
           ))}
         </div>
 
-        <div className="min-h-[80px] bg-indigo-50 rounded-2xl flex flex-wrap gap-2 justify-center items-center p-4 mb-6 border-2 border-dashed border-indigo-200">
-          {selectedLetters.map(l => (
-            <button key={l.id} onClick={() => {
-              setSelectedLetters(prev => prev.filter(i => i.id !== l.id));
-              setScrambledLetters(prev => [...prev, l]);
-            }} className="w-12 h-12 bg-indigo-600 text-white rounded-xl font-bold text-xl shadow-md">{l.char.toUpperCase()}</button>
-          ))}
+        {/* 답변 영역: 버튼이 아닌 큰 글자로 표시 */}
+        <div className="min-h-[120px] bg-indigo-50 rounded-2xl flex flex-wrap gap-4 justify-center items-center p-6 mb-8 border-2 border-dashed border-indigo-200">
+          {selectedLetters.length === 0 ? (
+            <span className="text-indigo-200 text-sm font-bold uppercase tracking-widest">Select Letters</span>
+          ) : (
+            selectedLetters.map(l => (
+              <span 
+                key={l.id} 
+                onClick={() => {
+                  setSelectedLetters(prev => prev.filter(i => i.id !== l.id));
+                  setScrambledLetters(prev => [...prev, l]);
+                }} 
+                className="text-4xl font-black text-indigo-600 cursor-pointer hover:text-indigo-400 transition-colors animate-in fade-in zoom-in duration-200"
+              >
+                {l.char.toUpperCase()}
+              </span>
+            ))
+          )}
         </div>
 
         <div className="flex gap-2">
-          <button onClick={() => { setScrambledLetters(prev => [...prev, ...selectedLetters]); setSelectedLetters([]); }} className="flex-1 bg-gray-100 py-4 rounded-2xl font-bold text-gray-500">RESET</button>
-          <button onClick={checkGuess} disabled={isCorrect} className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg disabled:bg-green-500">
+          <button onClick={() => { setScrambledLetters(prev => [...prev, ...selectedLetters]); setSelectedLetters([]); }} className="flex-1 bg-gray-100 py-4 rounded-2xl font-bold text-gray-400">RESET</button>
+          <button onClick={checkGuess} disabled={selectedLetters.length === 0 || isCorrect} className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg disabled:bg-green-500">
             {isCorrect ? 'PERFECT!' : 'CHECK'}
           </button>
         </div>
-        {message && <div className="mt-4 text-center font-bold text-indigo-600">{message}</div>}
+        {message && <div className="mt-4 text-center font-black text-indigo-600 tracking-widest animate-pulse">{message}</div>}
       </div>
     </div>
   );
