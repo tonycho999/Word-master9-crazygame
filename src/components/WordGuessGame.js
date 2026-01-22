@@ -20,13 +20,8 @@ const WordGuessGame = () => {
   const [isCorrect, setIsCorrect] = useState(false);
   const [showHint, setShowHint] = useState(false);
 
-  // 현재 정답 단어들을 배열로 분리 (예: ["apple", "juice"])
-  const targetWords = currentWord.trim().split(/\s+/).filter(w => w.length > 0);
-
-  // 각 단어의 첫 글자들을 모아서 힌트로 만듦 (예: "A..., J...")
-  const getMultiHint = () => {
-    return targetWords.map(word => word[0].toUpperCase() + "...").join(", ");
-  };
+  // 정답 단어 리스트 (예: ["lion", "tiger"])
+  const targetWords = currentWord.toLowerCase().split(/\s+/).filter(w => w.length > 0);
 
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
@@ -65,11 +60,12 @@ const WordGuessGame = () => {
     if (!currentWord || scrambledLetters.length === 0) loadNewWord();
   }, [currentWord, scrambledLetters.length, loadNewWord]);
 
+  // 순서와 상관없이 정답 체크
   const checkGuess = () => {
-    const user = selectedLetters.map(l => l.char).join('').toLowerCase();
-    const correct = currentWord.replace(/\s/g, '').toLowerCase();
+    const userCombined = selectedLetters.map(l => l.char).join('').toLowerCase();
+    const correctCombined = currentWord.replace(/\s/g, '').toLowerCase();
 
-    if (user === correct) {
+    if (userCombined === correctCombined) {
       setMessage('EXCELLENT! 🎉');
       setIsCorrect(true);
       setTimeout(() => {
@@ -82,20 +78,23 @@ const WordGuessGame = () => {
     }
   };
 
-  const renderSelectedWords = () => {
-    let currentIdx = 0;
-    return targetWords.map((word, wordIdx) => {
-      const wordLen = word.length;
-      const wordLetters = selectedLetters.slice(currentIdx, currentIdx + wordLen);
-      currentIdx += wordLen;
+  // 핵심 로직: 현재 입력된 글자들을 단어 덩어리로 분석하여 렌더링
+  const renderDynamicWords = () => {
+    let remainingSelected = [...selectedLetters];
+    let displayRows = [];
 
-      const isWordComplete = wordLetters.length === wordLen;
-      const isWordCorrect = isWordComplete && wordLetters.map(l => l.char).join('').toLowerCase() === word;
+    // 각 정답 단어 자리를 순회하며 매칭 시도
+    targetWords.forEach((target, idx) => {
+      const targetLen = target.length;
+      // 현재 남은 선택 글자 중 이 단어 길이에 맞는 뭉치를 가져옴
+      const chunk = remainingSelected.slice(0, targetLen);
+      const chunkText = chunk.map(l => l.char).join('').toLowerCase();
+      const isMatch = chunkText === target;
 
-      return (
-        <div key={wordIdx} className="flex flex-col items-center mb-6 last:mb-0 w-full">
-          <div className="flex gap-2 items-center flex-wrap justify-center">
-            {wordLetters.map((l) => (
+      displayRows.push(
+        <div key={idx} className="flex flex-col items-center mb-6 last:mb-0 w-full">
+          <div className="flex gap-2 items-center flex-wrap justify-center min-h-[40px]">
+            {chunk.map((l) => (
               <span 
                 key={l.id} 
                 onClick={() => {
@@ -103,18 +102,34 @@ const WordGuessGame = () => {
                   setScrambledLetters(prev => [...prev, l]);
                 }} 
                 className={`font-black cursor-pointer transition-all duration-300 ${
-                  isWordCorrect ? 'text-green-500 scale-110' : 'text-indigo-600'
-                } ${wordLen > 8 ? 'text-2xl' : 'text-4xl'}`}
+                  isMatch ? 'text-green-500 scale-110' : 'text-indigo-600'
+                } ${targetLen > 8 ? 'text-2xl' : 'text-4xl'}`}
               >
                 {l.char.toUpperCase()}
               </span>
             ))}
-            {isWordCorrect && <span className="text-green-500 font-bold ml-2">✓</span>}
+            {isMatch && <span className="text-green-500 font-bold ml-2">✓</span>}
           </div>
-          <div className={`h-1.5 rounded-full mt-2 transition-all duration-500 ${isWordCorrect ? 'bg-green-400 w-full' : 'bg-indigo-100 w-16'}`} />
+          <div className={`h-1.5 rounded-full mt-2 transition-all duration-500 ${isMatch ? 'bg-green-400 w-full' : 'bg-indigo-100 w-16'}`} />
         </div>
       );
+      
+      // 처리한 글자들은 제외
+      remainingSelected = remainingSelected.slice(targetLen);
     });
+
+    // 만약 단어 길이를 초과해서 더 입력된 글자가 있다면 하단에 추가 표시
+    if (remainingSelected.length > 0) {
+      displayRows.push(
+        <div key="extra" className="flex gap-2 mt-4 opacity-50">
+          {remainingSelected.map(l => (
+            <span key={l.id} className="text-xl font-bold text-red-400">{l.char.toUpperCase()}</span>
+          ))}
+        </div>
+      );
+    }
+
+    return displayRows;
   };
 
   return (
@@ -140,17 +155,16 @@ const WordGuessGame = () => {
           </div>
 
           <div className="flex justify-center gap-3">
-            <button onClick={() => setShowHint(!showHint)} className="px-4 py-2 bg-gray-50 border rounded-full text-xs font-bold hover:bg-gray-100">
+            <button onClick={() => setShowHint(!showHint)} className="px-4 py-2 bg-gray-50 border rounded-full text-xs font-bold hover:bg-gray-100 transition-colors">
               <Lightbulb size={14} className="inline mr-1"/>HINT
             </button>
-            <button onClick={() => setScrambledLetters(prev => [...prev].sort(() => Math.random() - 0.5))} className="px-4 py-2 bg-gray-50 border rounded-full text-xs font-bold hover:bg-gray-100">
+            <button onClick={() => setScrambledLetters(prev => [...prev].sort(() => Math.random() - 0.5))} className="px-4 py-2 bg-gray-50 border rounded-full text-xs font-bold hover:bg-gray-100 transition-colors">
               <RotateCcw size={14} className="inline mr-1"/>SHUFFLE
             </button>
           </div>
-          {/* 수정된 힌트 표시 영역: 모든 단어의 첫 글자 출력 */}
           {showHint && (
-            <div className="mt-3 p-2 bg-yellow-50 rounded-xl border border-yellow-100 text-xs text-yellow-700 font-bold animate-fade-in">
-              Starts with: <span className="text-indigo-600">{getMultiHint()}</span>
+            <div className="mt-3 p-2 bg-yellow-50 rounded-xl border border-yellow-100 text-xs text-yellow-700 font-bold">
+              Starts with: <span className="text-indigo-600">{targetWords.map(w => w[0].toUpperCase() + "...").join(", ")}</span>
             </div>
           )}
         </div>
@@ -169,9 +183,9 @@ const WordGuessGame = () => {
 
         <div className="min-h-[160px] bg-indigo-50 rounded-2xl flex flex-col justify-center items-center p-6 mb-8 border-2 border-dashed border-indigo-200">
           {selectedLetters.length === 0 ? (
-            <span className="text-indigo-200 text-sm font-bold uppercase tracking-widest text-center">Select Letters in Order</span>
+            <span className="text-indigo-200 text-sm font-bold uppercase tracking-widest text-center">Touch Letters to Answer</span>
           ) : (
-            <div className="w-full">{renderSelectedWords()}</div>
+            <div className="w-full">{renderDynamicWords()}</div>
           )}
         </div>
 
@@ -180,13 +194,13 @@ const WordGuessGame = () => {
             setScrambledLetters(prev => [...prev, ...selectedLetters]);
             setSelectedLetters([]);
             setMessage('');
-          }} className="flex-1 bg-gray-50 py-4 rounded-2xl font-bold text-gray-400">RESET</button>
-          <button onClick={checkGuess} disabled={selectedLetters.length === 0 || isCorrect} className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg disabled:bg-green-500 transition-all">
+          }} className="flex-1 bg-gray-50 py-4 rounded-2xl font-bold text-gray-400 hover:bg-gray-100 transition-colors">RESET</button>
+          <button onClick={checkGuess} disabled={selectedLetters.length === 0 || isCorrect} className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg disabled:bg-green-500 transition-all hover:bg-indigo-700">
             {isCorrect ? 'PERFECT!' : 'CHECK'}
           </button>
         </div>
         
-        {message && <div className="mt-4 text-center font-black text-indigo-600 tracking-widest uppercase">{message}</div>}
+        {message && <div className="mt-4 text-center font-black text-indigo-600 tracking-widest uppercase animate-pulse">{message}</div>}
       </div>
     </div>
   );
