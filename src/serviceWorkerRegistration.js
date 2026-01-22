@@ -1,4 +1,3 @@
-// 이 코드는 create-react-app의 기본 PWA 템플릿 코드입니다.
 const isLocalhost = Boolean(
   window.location.hostname === 'localhost' ||
     window.location.hostname === '[::1]' ||
@@ -39,7 +38,7 @@ function registerValidSW(swUrl, config) {
         };
       };
     })
-    .catch((error) => console.error('Error during service worker registration:', error));
+    .catch((error) => console.error('Error during SW registration:', error));
 }
 
 function checkValidServiceWorker(swUrl, config) {
@@ -53,14 +52,11 @@ function checkValidServiceWorker(swUrl, config) {
       } else {
         registerValidSW(swUrl, config);
       }
-    })
-    .catch(() => console.log('No internet connection found. App is running in offline mode.'));
+    });
 }
 
 export function unregister() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.ready
-      .then((registration) => registration.unregister())
-      .catch((error) => console.error(error.message));
+    navigator.serviceWorker.ready.then((registration) => registration.unregister());
   }
 }
