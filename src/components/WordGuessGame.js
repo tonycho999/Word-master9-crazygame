@@ -6,23 +6,13 @@ const WordGuessGame = () => {
   const [level, setLevel] = useState(() => Number(localStorage.getItem('word-game-level')) || 1);
   const [score, setScore] = useState(() => Number(localStorage.getItem('word-game-score')) || 0);
   const [usedWordIndices, setUsedWordIndices] = useState(() => {
-    try {
-      const saved = localStorage.getItem('word-game-used-indices');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
+    try { return JSON.parse(localStorage.getItem('word-game-used-indices')) || []; } catch { return []; }
   });
 
   const [currentWord, setCurrentWord] = useState(() => localStorage.getItem('word-game-current-word') || '');
   const [category, setCategory] = useState(() => localStorage.getItem('word-game-category') || '');
   const [scrambledLetters, setScrambledLetters] = useState(() => {
-    try {
-      const saved = localStorage.getItem('word-game-scrambled');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
+    try { return JSON.parse(localStorage.getItem('word-game-scrambled')) || []; } catch { return []; }
   });
 
   const [selectedLetters, setSelectedLetters] = useState([]);
@@ -30,10 +20,8 @@ const WordGuessGame = () => {
   const [isCorrect, setIsCorrect] = useState(false);
   const [showHint, setShowHint] = useState(false);
 
-  const getWordCount = useCallback(() => {
-    if (!currentWord) return 0;
-    return currentWord.trim().split(/\s+/).length;
-  }, [currentWord]);
+  // 현재 정답 단어들을 배열로 분리 (예: ["apple", "juice"])
+  const targetWords = currentWord.toLowerCase().split(/\s+/);
 
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
@@ -69,9 +57,7 @@ const WordGuessGame = () => {
   }, [level, usedWordIndices]);
 
   useEffect(() => {
-    if (!currentWord || scrambledLetters.length === 0) {
-      loadNewWord();
-    }
+    if (!currentWord || scrambledLetters.length === 0) loadNewWord();
   }, [currentWord, scrambledLetters.length, loadNewWord]);
 
   const checkGuess = () => {
@@ -91,6 +77,44 @@ const WordGuessGame = () => {
     }
   };
 
+  // 입력된 글자들을 단어별로 묶어서 렌더링하는 로직
+  const renderSelectedWords = () => {
+    let currentIdx = 0;
+    return targetWords.map((word, wordIdx) => {
+      const wordLen = word.length;
+      const wordLetters = selectedLetters.slice(currentIdx, currentIdx + wordLen);
+      currentIdx += wordLen;
+
+      const isWordComplete = wordLetters.length === wordLen;
+      const isWordCorrect = isWordComplete && wordLetters.map(l => l.char).join('').toLowerCase() === word;
+
+      return (
+        <div key={wordIdx} className="flex flex-col items-center mb-4 last:mb-0">
+          <div className="flex gap-2 items-center">
+            {wordLetters.map((l) => (
+              <span 
+                key={l.id} 
+                onClick={() => {
+                  setSelectedLetters(prev => prev.filter(i => i.id !== l.id));
+                  setScrambledLetters(prev => [...prev, l]);
+                }} 
+                className={`font-black cursor-pointer transition-all duration-300 ${
+                  isWordCorrect ? 'text-green-500 scale-110' : 'text-indigo-600'
+                } ${wordLen > 8 ? 'text-2xl' : 'text-4xl'}`}
+              >
+                {l.char.toUpperCase()}
+              </span>
+            ))}
+            {/* 단어 완성 시 체크 표시 */}
+            {isWordCorrect && <span className="text-green-500 font-bold ml-2">✓</span>}
+          </div>
+          {/* 단어 구분선 (시각적 피드백) */}
+          <div className={`h-1 rounded-full mt-1 transition-all duration-500 ${isWordCorrect ? 'bg-green-400 w-full' : 'bg-indigo-100 w-12'}`} />
+        </div>
+      );
+    });
+  };
+
   return (
     <div className="min-h-screen bg-indigo-600 flex items-center justify-center p-4 font-sans text-gray-800">
       <div className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-md">
@@ -104,61 +128,34 @@ const WordGuessGame = () => {
         </div>
 
         <div className="text-center mb-6">
-          <div className="flex flex-col items-center gap-1 mb-4">
-            <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">{category}</h2>
-            <span className="text-[10px] font-bold text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-md mt-1">
-              {getWordCount()} {getWordCount() > 1 ? 'WORDS' : 'WORD'}
-            </span>
-          </div>
-
+          <h2 className="text-2xl font-black mb-4 uppercase">{category}</h2>
           <div className="flex justify-center gap-3">
-            <button onClick={() => setShowHint(!showHint)} className="flex items-center gap-1 text-xs font-bold px-4 py-2 bg-gray-50 border rounded-full hover:bg-gray-100">
-              <Lightbulb size={14} /> HINT
-            </button>
-            <button onClick={() => setScrambledLetters(prev => [...prev].sort(() => Math.random() - 0.5))} className="flex items-center gap-1 text-xs font-bold px-4 py-2 bg-gray-50 border rounded-full hover:bg-gray-100">
-              <RotateCcw size={14} /> SHUFFLE
-            </button>
+            <button onClick={() => setShowHint(!showHint)} className="px-4 py-2 bg-gray-50 border rounded-full text-xs font-bold"><Lightbulb size={14} className="inline mr-1"/>HINT</button>
+            <button onClick={() => setScrambledLetters(prev => [...prev].sort(() => Math.random() - 0.5))} className="px-4 py-2 bg-gray-50 border rounded-full text-xs font-bold"><RotateCcw size={14} className="inline mr-1"/>SHUFFLE</button>
           </div>
-          {showHint && <div className="mt-3 text-xs text-indigo-500 font-bold uppercase">Starts with: {currentWord[0]?.toUpperCase()}</div>}
+          {showHint && <div className="mt-3 text-xs text-indigo-500 font-bold">Starts with: {currentWord[0]?.toUpperCase()}</div>}
         </div>
 
-        <div className="flex flex-wrap gap-2 justify-center mb-10 min-h-[60px]">
+        {/* 알파벳 선택 영역 */}
+        <div className="flex flex-wrap gap-2 justify-center mb-8 min-h-[60px]">
           {scrambledLetters.map(l => (
-            <button 
-              key={l.id} 
-              onClick={() => {
-                setScrambledLetters(prev => prev.filter(i => i.id !== l.id));
-                setSelectedLetters(prev => [...prev, l]);
-                setMessage('');
-              }} 
-              className="w-12 h-12 bg-white border-2 border-gray-100 rounded-xl font-bold text-xl shadow-sm hover:border-indigo-400 active:scale-90 transition-all"
-            >
+            <button key={l.id} onClick={() => {
+              setScrambledLetters(prev => prev.filter(i => i.id !== l.id));
+              setSelectedLetters(prev => [...prev, l]);
+              setMessage('');
+            }} className="w-11 h-11 bg-white border-2 border-gray-100 rounded-xl font-bold text-lg shadow-sm active:scale-90 transition-all">
               {l.char.toUpperCase()}
             </button>
           ))}
         </div>
 
-        <div className="min-h-[100px] bg-indigo-50 rounded-2xl flex justify-center items-center p-4 mb-8 border-2 border-dashed border-indigo-200 overflow-x-auto">
-          <div className="flex gap-2 px-2 whitespace-nowrap items-center">
-            {selectedLetters.length === 0 ? (
-              <span className="text-indigo-200 text-sm font-bold uppercase tracking-widest">Select Letters</span>
-            ) : (
-              selectedLetters.map(l => (
-                <span 
-                  key={l.id} 
-                  onClick={() => {
-                    setSelectedLetters(prev => prev.filter(i => i.id !== l.id));
-                    setScrambledLetters(prev => [...prev, l]);
-                  }} 
-                  className={`font-black text-indigo-600 cursor-pointer transition-all ${
-                    selectedLetters.length > 12 ? 'text-xl' : selectedLetters.length > 8 ? 'text-2xl' : 'text-4xl'
-                  }`}
-                >
-                  {l.char.toUpperCase()}
-                </span>
-              ))
-            )}
-          </div>
+        {/* 답변 영역: 단어별 줄바꿈 및 성공 표시 */}
+        <div className="min-h-[150px] bg-indigo-50 rounded-2xl flex flex-col justify-center items-center p-6 mb-8 border-2 border-dashed border-indigo-200">
+          {selectedLetters.length === 0 ? (
+            <span className="text-indigo-200 text-sm font-bold uppercase tracking-widest">Select Letters</span>
+          ) : (
+            renderSelectedWords()
+          )}
         </div>
 
         <div className="flex gap-2">
@@ -166,13 +163,13 @@ const WordGuessGame = () => {
             setScrambledLetters(prev => [...prev, ...selectedLetters]);
             setSelectedLetters([]);
             setMessage('');
-          }} className="flex-1 bg-gray-100 py-4 rounded-2xl font-bold text-gray-400 hover:bg-gray-200">RESET</button>
+          }} className="flex-1 bg-gray-100 py-4 rounded-2xl font-bold text-gray-400">RESET</button>
           <button onClick={checkGuess} disabled={selectedLetters.length === 0 || isCorrect} className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg disabled:bg-green-500 transition-colors">
             {isCorrect ? 'PERFECT!' : 'CHECK'}
           </button>
         </div>
         
-        {message && <div className="mt-4 text-center font-black text-indigo-600 tracking-widest uppercase">{message}</div>}
+        {message && <div className="mt-4 text-center font-black text-indigo-600 tracking-widest">{message}</div>}
       </div>
     </div>
   );
