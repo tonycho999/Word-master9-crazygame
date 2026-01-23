@@ -1,6 +1,12 @@
 {
   "short_name": "WordMaster",
   "name": "Word Scramble Master",
+  "id": "/word-scramble-game",
+  "start_url": "./",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#4f46e5",
+  "background_color": "#4f46e5",
   "icons": [
     {
       "src": "logo192.png",
@@ -14,10 +20,5 @@
       "sizes": "512x512",
       "purpose": "any maskable"
     }
-  ],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#4f46e5",
-  "background_color": "#ffffff",
-  "scope": "/"
+  ]
 }
