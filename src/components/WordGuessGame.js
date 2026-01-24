@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Trophy, Delete, ArrowRight, Lightbulb, RotateCcw, PlayCircle, X } from 'lucide-react';
+import { Trophy, Delete, ArrowRight, Lightbulb, RotateCcw, PlayCircle } from 'lucide-react';
 import { wordDatabase, twoWordDatabase, threeWordDatabase } from '../data/wordDatabase';
 
 const WordGuessGame = () => {
@@ -13,7 +13,6 @@ const WordGuessGame = () => {
     } catch { return []; }
   });
 
-  // 게임 진행 상황 저장용 상태들
   const [currentWord, setCurrentWord] = useState(() => localStorage.getItem('word-game-current-word') || '');
   const [category, setCategory] = useState(() => localStorage.getItem('word-game-category') || '');
   const [wordType, setWordType] = useState(() => localStorage.getItem('word-game-word-type') || 'Normal');
@@ -34,11 +33,10 @@ const WordGuessGame = () => {
   const [hintLevel, setHintLevel] = useState(0);
   const [message, setMessage] = useState('');
   const [isAdLoading, setIsAdLoading] = useState(false);
-  const [showInterstitial, setShowInterstitial] = useState(false);
 
   const matchedWordsRef = useRef(new Set());
 
-  // --- 2. 데이터 영구 저장 (새로고침 대응) ---
+  // --- 2. 데이터 영구 저장 ---
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
     localStorage.setItem('word-game-score', score);
@@ -100,27 +98,21 @@ const WordGuessGame = () => {
 
   useEffect(() => { if (!currentWord) loadNewWord(); }, [currentWord, loadNewWord]);
 
-  // --- 5. 힌트 기능 (확실한 복구) ---
+  // --- 5. 힌트 기능 (복구 및 강화) ---
   const handleHint = () => {
     playSound('click');
     if (score < 100 || isCorrect || hintLevel > 0) return;
 
-    // 공백 무시한 진짜 첫 글자 찾기
     const targetChar = currentWord.replace(/\s/g, '').charAt(0).toUpperCase();
-    
-    // 섞여있는 글자들 중에서 해당 글자 객체 찾기
     const foundIdx = scrambledLetters.findIndex(l => l.char.toUpperCase() === targetChar);
 
     if (foundIdx !== -1) {
       const hintLetter = scrambledLetters[foundIdx];
       setScore(s => s - 100);
       setHintLevel(1);
-      
-      // 글자 이동: scrambled -> selected
       setScrambledLetters(prev => prev.filter((_, idx) => idx !== foundIdx));
-      setSelectedLetters(prev => [...prev, hintLetter]);
+      setSelectedLetters(prev => [hintLetter, ...prev]);
     } else {
-      // 이미 유저가 첫 글자를 직접 골랐을 경우
       setMessage("첫 글자가 이미 선택되었습니다!");
       setTimeout(() => setMessage(''), 2000);
     }
