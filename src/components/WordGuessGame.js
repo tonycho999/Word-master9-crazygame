@@ -50,7 +50,7 @@ const WordGuessGame = () => {
     localStorage.setItem('word-game-hint-level', hintLevel);
   }, [level, score, usedWordIds, currentWord, category, wordType, scrambledLetters, selectedLetters, hintLevel]);
 
-  // --- 3. 효과음 엔진 (끊김 방지 재사용 패턴) ---
+  // --- 3. 효과음 엔진 ---
   const playSound = useCallback(async (type) => {
     try {
       if (!audioCtxRef.current) {
@@ -73,7 +73,6 @@ const WordGuessGame = () => {
         osc.frequency.setValueAtTime(523.25, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.1);
         gain.gain.setValueAtTime(0.1, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
         osc.start(); osc.stop(ctx.currentTime + 0.2);
       } else if (type === 'allSuccess') {
         [523, 659, 783, 1046].forEach((f, i) => {
@@ -127,13 +126,14 @@ const WordGuessGame = () => {
   // --- 5. 핸들러 ---
   const handleHint = () => {
     playSound('click');
-    if (isCorrect) return;
+    if (isCorrect || hintLevel >= 2) return;
+
     if (hintLevel === 0 && score >= 100) {
       setScore(s => s - 100); setHintLevel(1);
     } else if (hintLevel === 1 && score >= 200) {
       setScore(s => s - 200); setHintLevel(2);
     } else {
-      setMessage("Low points!"); setTimeout(() => setMessage(''), 2000);
+      setMessage("Not enough points!"); setTimeout(() => setMessage(''), 2000);
     }
   };
 
@@ -229,7 +229,7 @@ const WordGuessGame = () => {
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans relative text-gray-900">
       <div className="bg-white rounded-[2rem] p-6 sm:p-8 w-full max-w-md shadow-2xl flex flex-col items-center border-t-8 border-indigo-500 mx-auto">
         <div className="w-full flex justify-between items-center mb-4 font-black text-indigo-600">
-          <span className="text-lg">LV {level}</span>
+          <span className="text-lg uppercase tracking-tighter">LEVEL {level}</span>
           <span className="flex items-center gap-1 text-gray-700"><Trophy size={18} className="text-yellow-500"/> {score}</span>
         </div>
 
@@ -245,8 +245,13 @@ const WordGuessGame = () => {
         {/* --- 버튼 섹션 --- */}
         <div className="w-full space-y-2 mb-6">
           <div className="flex gap-2 w-full">
-            <button onClick={handleHint} disabled={isCorrect || hintLevel >= 2} className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 uppercase active:scale-95 shadow-sm disabled:opacity-40">
-              <Lightbulb size={12}/> Hint {hintLevel + 1}
+            <button 
+              onClick={handleHint} 
+              disabled={isCorrect || hintLevel >= 2} 
+              className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 uppercase active:scale-95 shadow-sm disabled:opacity-40"
+            >
+              <Lightbulb size={12}/> 
+              {hintLevel === 0 ? 'Hint 1 (-100P)' : hintLevel === 1 ? 'Hint 2 (-200P)' : 'No More Hints'}
             </button>
             <button onClick={() => { playSound('click'); setScrambledLetters(p => [...p].sort(() => Math.random() - 0.5)); }} className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 uppercase active:scale-95 shadow-sm">
               <RotateCcw size={12}/> Shuffle
@@ -263,7 +268,6 @@ const WordGuessGame = () => {
           ))}
         </div>
 
-        {/* --- 정답 공간 최적화 (폰트 축소, 패딩 축소) --- */}
         <div className={`w-full min-h-[120px] rounded-[1.5rem] flex flex-col justify-center items-center p-4 mb-6 border-2 border-dashed transition-all ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
           {selectedLetters.length === 0 ? <span className="text-gray-300 font-black uppercase text-[10px] tracking-widest text-center px-4">Tap letters below</span> : <div className="w-full">{renderedComponents}</div>}
           {(isCorrect || message) && <div className="text-green-500 font-black mt-2 text-xs tracking-widest animate-bounce">{message || 'CORRECT!'}</div>}
