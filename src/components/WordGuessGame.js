@@ -35,11 +35,9 @@ const WordGuessGame = () => {
   const [isAdLoading, setIsAdLoading] = useState(false);
 
   const matchedWordsRef = useRef(new Set());
-  
-  // 오디오 컨텍스트를 하나만 유지하기 위한 Ref
   const audioCtxRef = useRef(null);
 
-  // --- 2. 로컬 스토리지 저장 ---
+  // --- 2. 데이터 영구 저장 ---
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
     localStorage.setItem('word-game-score', score);
@@ -52,20 +50,14 @@ const WordGuessGame = () => {
     localStorage.setItem('word-game-hint-level', hintLevel);
   }, [level, score, usedWordIds, currentWord, category, wordType, scrambledLetters, selectedLetters, hintLevel]);
 
-  // --- 3. 개선된 효과음 엔진 (끊김 방지) ---
+  // --- 3. 효과음 엔진 (끊김 방지 재사용 패턴) ---
   const playSound = useCallback(async (type) => {
     try {
-      // 1. 컨텍스트가 없으면 생성, 있으면 재사용
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
       }
-      
       const ctx = audioCtxRef.current;
-
-      // 2. 브라우저가 오디오를 잠재웠다면 깨우기
-      if (ctx.state === 'suspended') {
-        await ctx.resume();
-      }
+      if (ctx.state === 'suspended') await ctx.resume();
 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -76,15 +68,13 @@ const WordGuessGame = () => {
         osc.frequency.setValueAtTime(800, ctx.currentTime);
         gain.gain.setValueAtTime(0.1, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.05);
+        osc.start(); osc.stop(ctx.currentTime + 0.05);
       } else if (type === 'wordSuccess') {
         osc.frequency.setValueAtTime(523.25, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.1);
         gain.gain.setValueAtTime(0.1, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.2);
+        osc.start(); osc.stop(ctx.currentTime + 0.2);
       } else if (type === 'allSuccess') {
         [523, 659, 783, 1046].forEach((f, i) => {
           const o = ctx.createOscillator();
@@ -93,8 +83,7 @@ const WordGuessGame = () => {
           o.frequency.value = f;
           g.gain.setValueAtTime(0.1, ctx.currentTime + i*0.08);
           g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i*0.08 + 0.3);
-          o.start(ctx.currentTime + i*0.08);
-          o.stop(ctx.currentTime + 0.4);
+          o.start(ctx.currentTime + i*0.08); o.stop(ctx.currentTime + 0.4);
         });
       } else if (type === 'reward') {
         [440, 554, 659, 880, 1108].forEach((f, i) => {
@@ -104,16 +93,13 @@ const WordGuessGame = () => {
           o.frequency.value = f;
           g.gain.setValueAtTime(0.05, ctx.currentTime + i*0.1);
           g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i*0.1 + 0.3);
-          o.start(ctx.currentTime + i*0.1);
-          o.stop(ctx.currentTime + i*0.1 + 0.3);
+          o.start(ctx.currentTime + i*0.1); o.stop(ctx.currentTime + i*0.1 + 0.3);
         });
       }
-    } catch (e) {
-      console.warn('Audio playback failed:', e);
-    }
+    } catch (e) { console.warn('Audio failed', e); }
   }, []);
 
-  // --- 4. 단어 로드 로직 ---
+  // --- 4. 단어 로드 ---
   const loadNewWord = useCallback(() => {
     let db = level <= 5 ? wordDatabase : (level <= 15 ? twoWordDatabase : threeWordDatabase);
     const preferPhrase = Math.random() < 0.5;
@@ -138,20 +124,16 @@ const WordGuessGame = () => {
 
   useEffect(() => { if (!currentWord) loadNewWord(); }, [currentWord, loadNewWord]);
 
-  // --- 5. 힌트 핸들러 ---
+  // --- 5. 핸들러 ---
   const handleHint = () => {
     playSound('click');
     if (isCorrect) return;
-
     if (hintLevel === 0 && score >= 100) {
-      setScore(s => s - 100);
-      setHintLevel(1);
+      setScore(s => s - 100); setHintLevel(1);
     } else if (hintLevel === 1 && score >= 200) {
-      setScore(s => s - 200);
-      setHintLevel(2);
+      setScore(s => s - 200); setHintLevel(2);
     } else {
-      setMessage("Not enough points!");
-      setTimeout(() => setMessage(''), 2000);
+      setMessage("Low points!"); setTimeout(() => setMessage(''), 2000);
     }
   };
 
@@ -175,16 +157,13 @@ const WordGuessGame = () => {
       setScore(s => s + 200);
       setIsAdLoading(false);
       playSound('reward');
-      setMessage('Reward +200P!');
+      setMessage('+200P Reward!');
       setTimeout(() => setMessage(''), 2000);
     }, 2500);
   };
 
   // --- 6. 실시간 로직 ---
-  const targetWords = useMemo(() => 
-    currentWord.toLowerCase().split(/\s+/).filter(w => w.length > 0)
-  , [currentWord]);
-
+  const targetWords = useMemo(() => currentWord.toLowerCase().split(/\s+/).filter(w => w.length > 0), [currentWord]);
   const wordCount = targetWords.length;
 
   const { renderedComponents, allMatched } = useMemo(() => {
@@ -196,14 +175,12 @@ const WordGuessGame = () => {
       let matchInfo = null;
       for (let i = 0; i <= tempSelected.length - target.length; i++) {
         const slice = tempSelected.slice(i, i + target.length);
-        const sliceText = slice.map(l => l.char).join('').toLowerCase();
-        if (sliceText === target) {
-          matchInfo = { letters: slice, isMatch: true };
+        if (slice.map(l => l.char).join('').toLowerCase() === target) {
+          matchInfo = { letters: slice };
           slice.forEach(l => usedInMatch.add(l.id));
           matchedCount++;
           if (!matchedWordsRef.current.has(idx)) {
-            matchedWordsRef.current.add(idx);
-            playSound('wordSuccess');
+            matchedWordsRef.current.add(idx); playSound('wordSuccess');
           }
           break;
         }
@@ -217,16 +194,16 @@ const WordGuessGame = () => {
       const isWordMatch = res.matchInfo !== null;
       const displayLetters = isWordMatch ? res.matchInfo.letters : unmatchedLetters.splice(0, res.target.length);
       return (
-        <div key={`word-${idx}`} className="flex flex-col items-center mb-4 last:mb-0">
-          <div className="flex gap-1 items-center flex-wrap justify-center min-h-[40px]">
+        <div key={`word-${idx}`} className="flex flex-col items-center mb-2 last:mb-0">
+          <div className="flex gap-1 items-center flex-wrap justify-center min-h-[32px]">
             {displayLetters.map((l) => (
-              <span key={l.id} className={`text-3xl font-black transition-all ${isWordMatch ? 'text-green-500 scale-110' : 'text-indigo-600'}`}>
+              <span key={l.id} className={`text-2xl font-black transition-all ${isWordMatch ? 'text-green-500' : 'text-indigo-600'}`}>
                 {l.char.toUpperCase()}
               </span>
             ))}
-            {isWordMatch && <span className="text-green-500 ml-2 font-bold text-xl animate-bounce">✓</span>}
+            {isWordMatch && <span className="text-green-500 ml-1 font-bold text-lg">✓</span>}
           </div>
-          <div className={`h-1.5 rounded-full mt-1 transition-all duration-500 ${isWordMatch ? 'bg-green-400 w-full' : 'bg-indigo-100 w-16'}`} />
+          <div className={`h-1 rounded-full mt-0.5 transition-all duration-500 ${isWordMatch ? 'bg-green-400 w-full' : 'bg-indigo-50 w-12'}`} />
         </div>
       );
     });
@@ -239,61 +216,66 @@ const WordGuessGame = () => {
 
   useEffect(() => {
     if (allMatched && !isCorrect && currentWord) {
-      setIsCorrect(true);
-      playSound('allSuccess');
-      setMessage('CORRECT! 🎉');
+      setIsCorrect(true); playSound('allSuccess');
     }
   }, [allMatched, isCorrect, currentWord, playSound]);
 
   const processNextLevel = () => {
-    playSound('click');
-    setScore(s => s + 50);
-    setLevel(l => l + 1);
-    setUsedWordIds(p => [...p, currentWord]);
-    setCurrentWord('');
+    playSound('click'); setScore(s => s + 50); setLevel(l => l + 1);
+    setUsedWordIds(p => [...p, currentWord]); setCurrentWord('');
   };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans relative text-gray-900">
-      <div className="bg-white rounded-[2.5rem] p-6 sm:p-10 w-full max-w-md shadow-2xl flex flex-col items-center border-t-8 border-indigo-500 mx-auto">
-        <div className="w-full flex justify-between items-center mb-6 font-black text-indigo-600">
+      <div className="bg-white rounded-[2rem] p-6 sm:p-8 w-full max-w-md shadow-2xl flex flex-col items-center border-t-8 border-indigo-500 mx-auto">
+        <div className="w-full flex justify-between items-center mb-4 font-black text-indigo-600">
           <span className="text-lg">LV {level}</span>
           <span className="flex items-center gap-1 text-gray-700"><Trophy size={18} className="text-yellow-500"/> {score}</span>
         </div>
 
         <div className="text-center mb-6">
-          <div className="flex gap-2 justify-center mb-2">
+          <div className="flex gap-2 justify-center mb-1">
             <span className="bg-indigo-100 text-indigo-600 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">{wordCount} {wordCount > 1 ? 'Words' : 'Word'}</span>
             <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${wordType === 'Phrase' ? 'bg-pink-100 text-pink-600' : 'bg-green-100 text-green-600'}`}>{wordType}</span>
           </div>
-          <h2 className="text-4xl font-black text-gray-900 tracking-tight uppercase leading-none mb-2">{category}</h2>
-          {hintDisplay && <div className="text-indigo-500 font-bold text-sm animate-pulse">{hintDisplay}</div>}
+          <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase mb-1">{category}</h2>
+          {hintDisplay && <div className="text-indigo-500 font-bold text-xs animate-pulse h-4">{hintDisplay}</div>}
         </div>
 
-        <div className="flex gap-2 mb-8">
-          <button onClick={handleHint} disabled={isCorrect || hintLevel >= 2} className="px-4 py-2 bg-gray-50 border border-gray-100 rounded-full text-[10px] font-black flex items-center gap-1 uppercase active:scale-95 shadow-sm disabled:opacity-40"><Lightbulb size={12}/> {hintLevel === 0 ? 'Hint 1' : hintLevel === 1 ? 'Hint 2' : 'Done'}</button>
-          <button onClick={() => { playSound('click'); setScrambledLetters(p => [...p].sort(() => Math.random() - 0.5)); }} className="px-4 py-2 bg-gray-50 border border-gray-100 rounded-full text-[10px] font-black flex items-center gap-1 uppercase active:scale-95 shadow-sm"><RotateCcw size={12}/> Shuffle</button>
-          <button onClick={handleRewardAd} className="px-4 py-2 bg-amber-400 text-white rounded-full text-[10px] font-black flex items-center gap-1 active:scale-95 shadow-md"><PlayCircle size={12}/> {isAdLoading ? '...' : '+200P'}</button>
+        {/* --- 버튼 섹션 --- */}
+        <div className="w-full space-y-2 mb-6">
+          <div className="flex gap-2 w-full">
+            <button onClick={handleHint} disabled={isCorrect || hintLevel >= 2} className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 uppercase active:scale-95 shadow-sm disabled:opacity-40">
+              <Lightbulb size={12}/> Hint {hintLevel + 1}
+            </button>
+            <button onClick={() => { playSound('click'); setScrambledLetters(p => [...p].sort(() => Math.random() - 0.5)); }} className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 uppercase active:scale-95 shadow-sm">
+              <RotateCcw size={12}/> Shuffle
+            </button>
+          </div>
+          <button onClick={handleRewardAd} className="w-full px-4 py-2.5 bg-amber-400 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-1 active:scale-95 shadow-md">
+            <PlayCircle size={14}/> {isAdLoading ? 'WATCHING...' : 'GET FREE +200P'}
+          </button>
         </div>
 
-        <div className="flex flex-wrap gap-2 justify-center mb-10 min-h-[60px]">
+        <div className="flex flex-wrap gap-2 justify-center mb-6 min-h-[50px]">
           {scrambledLetters.map(l => (
-            <button key={l.id} onClick={() => { playSound('click'); setSelectedLetters(p => [...p, l]); setScrambledLetters(p => p.filter(i => i.id !== l.id)); }} className="w-11 h-11 bg-white border-2 border-gray-100 rounded-xl font-black text-lg shadow-sm hover:border-indigo-400 active:scale-90 transition-all">{l.char.toUpperCase()}</button>
+            <button key={l.id} onClick={() => { playSound('click'); setSelectedLetters(p => [...p, l]); setScrambledLetters(p => p.filter(i => i.id !== l.id)); }} className="w-10 h-10 bg-white border-2 border-gray-100 rounded-xl font-black text-lg shadow-sm hover:border-indigo-400 active:scale-90 transition-all">{l.char.toUpperCase()}</button>
           ))}
         </div>
 
-        <div className={`w-full min-h-[160px] rounded-[2rem] flex flex-col justify-center items-center p-6 mb-8 border-2 border-dashed transition-all ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
-          {selectedLetters.length === 0 ? <span className="text-gray-300 font-black uppercase text-[10px] tracking-widest text-center">Tap letters below</span> : <div className="w-full">{renderedComponents}</div>}
-          {(isCorrect || message) && <div className="text-green-500 font-black mt-4 text-xs tracking-widest animate-bounce">{message}</div>}
+        {/* --- 정답 공간 최적화 (폰트 축소, 패딩 축소) --- */}
+        <div className={`w-full min-h-[120px] rounded-[1.5rem] flex flex-col justify-center items-center p-4 mb-6 border-2 border-dashed transition-all ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
+          {selectedLetters.length === 0 ? <span className="text-gray-300 font-black uppercase text-[10px] tracking-widest text-center px-4">Tap letters below</span> : <div className="w-full">{renderedComponents}</div>}
+          {(isCorrect || message) && <div className="text-green-500 font-black mt-2 text-xs tracking-widest animate-bounce">{message || 'CORRECT!'}</div>}
         </div>
 
         <div className="w-full">
           {isCorrect ? (
-            <button onClick={processNextLevel} className="w-full bg-green-500 text-white py-5 rounded-[2rem] font-black text-2xl shadow-lg flex items-center justify-center gap-2 hover:bg-green-600 transition-all">NEXT LEVEL <ArrowRight size={28}/></button>
+            <button onClick={processNextLevel} className="w-full bg-green-500 text-white py-4 rounded-[1.5rem] font-black text-xl shadow-lg flex items-center justify-center gap-2 hover:bg-green-600 transition-all">NEXT LEVEL <ArrowRight size={24}/></button>
           ) : (
-            <div className="flex gap-3">
-              <button onClick={() => { playSound('click'); setScrambledLetters(p => [...p, ...selectedLetters]); setSelectedLetters([]); }} className="flex-1 bg-gray-50 py-5 rounded-[1.5rem] font-black text-gray-400 border border-gray-100 uppercase text-[10px]">Reset</button>
-              <button onClick={() => { if(selectedLetters.length > 0) { playSound('click'); const last = selectedLetters[selectedLetters.length-1]; setSelectedLetters(p => p.slice(0, -1)); setScrambledLetters(p => [...p, last]); } }} className="flex-[2] bg-indigo-600 text-white py-5 rounded-[1.5rem] font-black text-xl flex items-center justify-center gap-2 shadow-xl active:scale-95"><Delete size={22}/> BACK</button>
+            <div className="flex gap-2">
+              <button onClick={() => { playSound('click'); setScrambledLetters(p => [...p, ...selectedLetters]); setSelectedLetters([]); }} className="flex-1 bg-gray-50 py-4 rounded-xl font-black text-gray-400 border border-gray-100 uppercase text-[10px]">Reset</button>
+              <button onClick={() => { if(selectedLetters.length > 0) { playSound('click'); const last = selectedLetters[selectedLetters.length-1]; setSelectedLetters(p => p.slice(0, -1)); setScrambledLetters(p => [...p, last]); } }} className="flex-[2] bg-indigo-600 text-white py-4 rounded-xl font-black text-lg flex items-center justify-center gap-2 shadow-xl active:scale-95"><Delete size={20}/> BACK</button>
             </div>
           )}
         </div>
