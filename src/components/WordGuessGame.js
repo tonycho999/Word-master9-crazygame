@@ -98,22 +98,33 @@ const WordGuessGame = () => {
 
   useEffect(() => { if (!currentWord) loadNewWord(); }, [currentWord, loadNewWord]);
 
-  // --- 5. 힌트 기능 (복구 및 강화) ---
+  // --- 5. 힌트 기능 (완전 수정) ---
   const handleHint = () => {
     playSound('click');
     if (score < 100 || isCorrect || hintLevel > 0) return;
 
+    // 공백을 제외한 정답의 첫 글자
     const targetChar = currentWord.replace(/\s/g, '').charAt(0).toUpperCase();
+    
+    // 섞인 글자들 중에서 해당 글자 찾기
     const foundIdx = scrambledLetters.findIndex(l => l.char.toUpperCase() === targetChar);
 
     if (foundIdx !== -1) {
       const hintLetter = scrambledLetters[foundIdx];
+      
+      // 1. 점수 차감 및 힌트 상태 변경
       setScore(s => s - 100);
       setHintLevel(1);
-      setScrambledLetters(prev => prev.filter((_, idx) => idx !== foundIdx));
-      setSelectedLetters(prev => [hintLetter, ...prev]);
+
+      // 2. 글자 이동 로직
+      // 먼저 Reset 기능을 수행하여 모든 선택된 글자를 되돌린 후 힌트 글자를 첫 번째로 설정
+      const allReturnedLetters = [...scrambledLetters, ...selectedLetters];
+      const remainingAfterHint = allReturnedLetters.filter(l => l.id !== hintLetter.id);
+      
+      setSelectedLetters([hintLetter]); // 힌트 글자를 첫 번째로 강제 지정
+      setScrambledLetters(remainingAfterHint); // 나머지는 다시 섞인 목록으로
     } else {
-      setMessage("첫 글자가 이미 선택되었습니다!");
+      setMessage("첫 글자가 이미 정답 칸에 있습니다!");
       setTimeout(() => setMessage(''), 2000);
     }
   };
@@ -195,7 +206,7 @@ const WordGuessGame = () => {
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans relative">
       <div className="bg-white rounded-[2.5rem] p-6 sm:p-10 w-full max-w-md shadow-2xl flex flex-col items-center border-t-8 border-indigo-500 mx-auto">
         <div className="w-full flex justify-between items-center mb-6 font-black text-indigo-600">
-          <span className="text-lg">LV {level}</span>
+          <span className="text-lg uppercase">LV {level}</span>
           <span className="flex items-center gap-1 text-gray-700"><Trophy size={18} className="text-yellow-500"/> {score}</span>
         </div>
 
