@@ -29,8 +29,7 @@ const WordGuessGame = () => {
   });
 
   const [isCorrect, setIsCorrect] = useState(false);
-  const [hintsUsed, setHintsUsed] = useState(0);
-  const [mistakeLetterId, setMistakeLetterId] = useState(null);
+  const [hintLevel, setHintLevel] = useState(0);
   const [message, setMessage] = useState('');
   const [isAdLoading, setIsAdLoading] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -176,7 +175,7 @@ const WordGuessGame = () => {
     setScrambledLetters(chars);
     setSelectedLetters([]);
     setIsCorrect(false);
-    setHintsUsed(0);
+    setHintLevel(0);
     setMessage('');
     matchedWordsRef.current = new Set();
   }, [level, usedWordIds]);
@@ -185,48 +184,30 @@ const WordGuessGame = () => {
 
   const handleHint = () => {
     playSound('click');
-    if (isCorrect || hintsUsed >= 5) return;
+    if (isCorrect || hintLevel >= 3) return;
     if (score < 100) {
       setMessage("Not enough points!");
       setTimeout(() => setMessage(''), 2000);
       return;
     }
-
     setScore(s => s - 100);
-    setHintsUsed(h => h + 1);
-
-    const solution = currentWord.replace(/\s/g, '');
-    const currentGuess = selectedLetters.map(l => l.char).join('');
-
-    let firstMistakeIndex = -1;
-    for (let i = 0; i < currentGuess.length; i++) {
-      if (currentGuess[i].toUpperCase() !== solution[i].toUpperCase()) {
-        firstMistakeIndex = i;
-        break;
-      }
-    }
-
-    if (firstMistakeIndex !== -1) {
-      const mistakeId = selectedLetters[firstMistakeIndex].id;
-      setMistakeLetterId(mistakeId);
-      setTimeout(() => setMistakeLetterId(null), 500); // Shake for 0.5s
-    } else {
-      // Correct so far, so add the next letter
-      if (currentGuess.length < solution.length) {
-        const nextLetter = solution[currentGuess.length].toUpperCase();
-        const letterInScrambled = scrambledLetters.find(
-          l =>
-            l.char.toUpperCase() === nextLetter &&
-            !selectedLetters.some(s => s.id === l.id)
-        );
-        if (letterInScrambled) {
-          setSelectedLetters(p => [...p, letterInScrambled]);
-          setScrambledLetters(p => p.filter(i => i.id !== letterInScrambled.id));
-        }
-      }
-    }
+    setHintLevel(h => h + 1);
   };
 
+
+  const hintDisplay = useMemo(() => {
+    if (hintLevel === 0 || !currentWord) return null;
+    const words = currentWord.split(/\s+/);
+    const hintParts = words.map(word => {
+      const first = word.charAt(0).toUpperCase();
+      const last = word.charAt(word.length - 1).toUpperCase();
+      if (hintLevel === 1) return `${first}...`;
+      if (hintLevel === 2) return `${first}...${last}`;
+      if (hintLevel === 3) return `${word.toUpperCase()} (${word.length})`;
+      return "";
+    });
+    return `Hint: ${hintParts.join(' / ')}`;
+  }, [currentWord, hintLevel]);
 
   const handleRewardAd = () => {
     if (adsWatched >= 10) return;
@@ -285,7 +266,7 @@ const WordGuessGame = () => {
                 key={l.id}
                 className={`text-2xl font-black transition-all ${
                   isWordMatch ? 'text-green-500' : 'text-indigo-600'
-                } ${mistakeLetterId === l.id ? 'shake' : ''}`}
+                }`}
               >
                 {l.char.toUpperCase()}
               </span>
@@ -301,7 +282,7 @@ const WordGuessGame = () => {
       renderedComponents: components, 
       allMatched: matchedCount === targetWords.length && selectedLetters.length === currentWord.replace(/\s/g, '').length 
     };
-  }, [selectedLetters, targetWords, currentWord, playSound, mistakeLetterId]);
+  }, [selectedLetters, targetWords, currentWord, playSound]);
 
   useEffect(() => {
     if (allMatched && !isCorrect && currentWord) {
@@ -315,7 +296,6 @@ const WordGuessGame = () => {
     setScore(s => s + 50);
     setLevel(l => l + 1);
     setCurrentWord('');
-    setHintsUsed(0);
   };
 
   const handleInstallClick = () => {
@@ -355,16 +335,17 @@ const WordGuessGame = () => {
             <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${wordType === 'Phrase' ? 'bg-pink-100 text-pink-600' : 'bg-green-100 text-green-600'}`}>{wordType}</span>
           </div>
           <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase mb-1">{category}</h2>
+          {hintDisplay && <div className="text-indigo-500 font-bold text-xs animate-pulse h-4 mt-1">{hintDisplay}</div>}
         </div>
 
         <div className="w-full space-y-2 mb-6">
           <div className="flex gap-2 w-full">
             <button
               onClick={handleHint}
-              disabled={isCorrect || hintsUsed >= 5 || score < 100}
+              disabled={isCorrect || hintLevel >= 3 || score < 100}
               className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 uppercase active:scale-95 shadow-sm disabled:opacity-40"
             >
-              <Lightbulb size={12} /> HINT ({5 - hintsUsed} LEFT) -100P
+              <Lightbulb size={12} /> HINT {hintLevel + 1} (-100P)
             </button>
             <button onClick={() => { playSound('click'); setScrambledLetters(p => [...p].sort(() => Math.random() - 0.5)); }} className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 uppercase active:scale-95 shadow-sm">
               <RotateCcw size={12}/> Shuffle
