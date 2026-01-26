@@ -40,8 +40,6 @@ const WordGuessGame = () => {
   const [message, setMessage] = useState('');
   const [isAdLoading, setIsAdLoading] = useState(false);
   const [isHintLoading, setIsHintLoading] = useState(false);
-  const [hintCooldown, setHintCooldown] = useState(0);
-  const [hintsUsedToday, setHintsUsedToday] = useState(0);
   const [adCooldown, setAdCooldown] = useState(0);
   const [adsWatched, setAdsWatched] = useState(0);
 
@@ -50,16 +48,6 @@ const WordGuessGame = () => {
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
-
-    // Handle hint daily limit
-    const lastHintDate = localStorage.getItem('word-game-hint-date');
-    if (lastHintDate === today) {
-      setHintsUsedToday(Number(localStorage.getItem('word-game-hints-used')) || 0);
-    } else {
-      localStorage.setItem('word-game-hint-date', today);
-      localStorage.setItem('word-game-hints-used', '0');
-      setHintsUsedToday(0);
-    }
 
     // Handle ad daily limit
     const lastAdDate = localStorage.getItem('word-game-ad-date');
@@ -72,10 +60,6 @@ const WordGuessGame = () => {
     }
 
     const cooldownTimer = setInterval(() => {
-      const hintCooldownEnd = Number(localStorage.getItem('word-game-hint-cooldown') || 0);
-      const hintRemaining = Math.max(0, Math.ceil((hintCooldownEnd - Date.now()) / 1000));
-      setHintCooldown(hintRemaining);
-
       const adCooldownEnd = Number(localStorage.getItem('word-game-ad-cooldown') || 0);
       const adRemaining = Math.max(0, Math.ceil((adCooldownEnd - Date.now()) / 1000));
       setAdCooldown(adRemaining);
@@ -189,9 +173,8 @@ const WordGuessGame = () => {
   useEffect(() => { if (!currentWord) loadNewWord(); }, [currentWord, loadNewWord]);
 
   const handleHint = () => {
-    if (isHintLoading || hintCooldown > 0 || hintsUsedToday >= 20) return;
+    if (isHintLoading || isCorrect || hintLevel >= 2) return;
     playSound('click');
-    if (isCorrect || hintLevel >= 3) return;
 
     setIsHintLoading(true);
 
@@ -199,14 +182,6 @@ const WordGuessGame = () => {
       if (score >= 100) {
         setScore(s => s - 100);
         setHintLevel(h => h + 1);
-
-        const newHintsUsed = hintsUsedToday + 1;
-        setHintsUsedToday(newHintsUsed);
-        localStorage.setItem('word-game-hints-used', newHintsUsed.toString());
-
-        const cooldownEnd = Date.now() + 5 * 60 * 1000;
-        localStorage.setItem('word-game-hint-cooldown', cooldownEnd.toString());
-        setHintCooldown(300);
       } else {
         setMessage("Not enough points!");
         setTimeout(() => setMessage(''), 2000);
@@ -223,7 +198,6 @@ const WordGuessGame = () => {
       const last = word.charAt(word.length - 1).toUpperCase();
       if (hintLevel === 1) return `${first}...`;
       if (hintLevel === 2) return word.length > 1 ? `${first}...${last}` : first;
-      if (hintLevel === 3) return `(${word.length})`;
       return "";
     });
     return `Hint: ${hintParts.join(' / ')}`;
@@ -335,13 +309,9 @@ const WordGuessGame = () => {
 
         <div className="w-full space-y-2 mb-6">
           <div className="flex gap-2 w-full">
-            <button onClick={handleHint} disabled={isCorrect || hintLevel >= 3 || isHintLoading || score < 100 || hintCooldown > 0 || hintsUsedToday >= 20} className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 uppercase active:scale-95 shadow-sm disabled:opacity-40">
+            <button onClick={handleHint} disabled={isCorrect || hintLevel >= 2 || isHintLoading || score < 100} className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 uppercase active:scale-95 shadow-sm disabled:opacity-40">
               <Lightbulb size={12}/>
-              {hintCooldown > 0
-                ? `WAIT ${Math.floor(hintCooldown / 60)}:${(hintCooldown % 60).toString().padStart(2, '0')}`
-                : hintsUsedToday >= 20
-                ? `LIMIT REACHED (${hintsUsedToday}/20)`
-                : `HINT ${hintLevel + 1} (-100P)`}
+              {hintLevel === 0 ? 'HINT 1 (-100P)' : hintLevel === 1 ? 'HINT 2 (-100P)' : 'NO MORE HINTS'}
             </button>
             <button onClick={() => { playSound('click'); setScrambledLetters(p => [...p].sort(() => Math.random() - 0.5)); }} className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 uppercase active:scale-95 shadow-sm">
               <RotateCcw size={12}/> Shuffle
