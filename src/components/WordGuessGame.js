@@ -42,14 +42,17 @@ const WordGuessGame = () => {
   const [isHintLoading, setIsHintLoading] = useState(false);
   const [hintCooldown, setHintCooldown] = useState(0);
   const [hintsUsedToday, setHintsUsedToday] = useState(0);
+  const [adCooldown, setAdCooldown] = useState(0);
+  const [adsWatched, setAdsWatched] = useState(0);
 
   const matchedWordsRef = useRef(new Set());
   const audioCtxRef = useRef(null);
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const lastHintDate = localStorage.getItem('word-game-hint-date');
 
+    // Handle hint daily limit
+    const lastHintDate = localStorage.getItem('word-game-hint-date');
     if (lastHintDate === today) {
       setHintsUsedToday(Number(localStorage.getItem('word-game-hints-used')) || 0);
     } else {
@@ -58,10 +61,24 @@ const WordGuessGame = () => {
       setHintsUsedToday(0);
     }
 
+    // Handle ad daily limit
+    const lastAdDate = localStorage.getItem('word-game-ad-date');
+    if (lastAdDate === today) {
+      setAdsWatched(Number(localStorage.getItem('word-game-ads-watched')) || 0);
+    } else {
+      localStorage.setItem('word-game-ad-date', today);
+      localStorage.setItem('word-game-ads-watched', '0');
+      setAdsWatched(0);
+    }
+
     const cooldownTimer = setInterval(() => {
-      const cooldownEnd = Number(localStorage.getItem('word-game-hint-cooldown') || 0);
-      const remaining = Math.max(0, Math.ceil((cooldownEnd - Date.now()) / 1000));
-      setHintCooldown(remaining);
+      const hintCooldownEnd = Number(localStorage.getItem('word-game-hint-cooldown') || 0);
+      const hintRemaining = Math.max(0, Math.ceil((hintCooldownEnd - Date.now()) / 1000));
+      setHintCooldown(hintRemaining);
+
+      const adCooldownEnd = Number(localStorage.getItem('word-game-ad-cooldown') || 0);
+      const adRemaining = Math.max(0, Math.ceil((adCooldownEnd - Date.now()) / 1000));
+      setAdCooldown(adRemaining);
     }, 1000);
 
     return () => clearInterval(cooldownTimer);
@@ -213,11 +230,23 @@ const WordGuessGame = () => {
   }, [currentWord, hintLevel]);
 
   const handleRewardAd = () => {
-    playSound('click');
+    if (isAdLoading || adCooldown > 0 || adsWatched >= 10) return;
     setIsAdLoading(true);
+    playSound('click');
     setTimeout(() => {
-      setScore(s => s + 200); setIsAdLoading(false);
-      playSound('reward'); setMessage('+200P Reward!');
+      setScore(s => s + 200);
+      setIsAdLoading(false);
+      playSound('reward');
+      setMessage('+200P Reward!');
+
+      const newAdsWatched = adsWatched + 1;
+      setAdsWatched(newAdsWatched);
+      localStorage.setItem('word-game-ads-watched', newAdsWatched.toString());
+
+      const cooldownEnd = Date.now() + 5 * 60 * 1000;
+      localStorage.setItem('word-game-ad-cooldown', cooldownEnd.toString());
+      setAdCooldown(300);
+
       setTimeout(() => setMessage(''), 2000);
     }, 2500);
   };
@@ -318,8 +347,15 @@ const WordGuessGame = () => {
               <RotateCcw size={12}/> Shuffle
             </button>
           </div>
-          <button onClick={handleRewardAd} className="w-full px-4 py-2.5 bg-amber-400 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-1 active:scale-95 shadow-md">
-            <PlayCircle size={14}/> {isAdLoading ? 'WATCHING...' : 'GET FREE +200P'}
+          <button onClick={handleRewardAd} disabled={isAdLoading || adCooldown > 0 || adsWatched >= 10} className="w-full px-4 py-2.5 bg-amber-400 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-1 active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+            <PlayCircle size={14}/>
+            {isAdLoading
+              ? 'WATCHING...'
+              : adCooldown > 0
+              ? `WAIT ${Math.floor(adCooldown / 60)}:${(adCooldown % 60).toString().padStart(2, '0')}`
+              : adsWatched >= 10
+              ? `DAILY LIMIT REACHED (${adsWatched}/10)`
+              : 'GET FREE +200P'}
           </button>
         </div>
 
