@@ -209,7 +209,7 @@ const WordGuessGame = () => {
       const isWordMatch = res.matchInfo !== null;
       const displayLetters = isWordMatch ? res.matchInfo.letters : unmatchedLetters.splice(0, res.target.length);
       return (
-        <div key={`word-${idx}`} className="flex flex-col items-center mb-2 last:mb-0">
+        <div key={`word-${idx}`} className="flex flex-col items-center mx-2 my-1">
           <div className="flex gap-1 items-center flex-wrap justify-center min-h-[32px]">
             {displayLetters.map((l) => (
               <span key={l.id} className={`text-2xl font-black transition-all ${isWordMatch ? 'text-green-500' : 'text-indigo-600'}`}>
@@ -281,7 +281,7 @@ const WordGuessGame = () => {
         </div>
 
         <div className={`w-full min-h-[120px] rounded-[1.5rem] flex flex-col justify-center items-center p-4 mb-6 border-2 border-dashed transition-all ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
-          {selectedLetters.length === 0 ? <span className="text-gray-300 font-black uppercase text-[10px] tracking-widest text-center px-4">Tap letters below</span> : <div className="w-full">{renderedComponents}</div>}
+          {selectedLetters.length === 0 ? <span className="text-gray-300 font-black uppercase text-[10px] tracking-widest text-center px-4">Tap letters below</span> : <div className="w-full flex flex-wrap justify-center items-center">{renderedComponents}</div>}
           {(isCorrect || message) && <div className="text-green-500 font-black mt-2 text-xs tracking-widest animate-bounce">{message || 'CORRECT!'}</div>}
         </div>
 
