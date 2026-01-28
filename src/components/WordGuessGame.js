@@ -59,7 +59,19 @@ const WordGuessGame = () => {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
+    const interval = setInterval(() => {
+      const currentNow = Date.now();
+      setNow(currentNow);
+
+      // Check for day rollover
+      const today = new Date().toDateString();
+      const savedDate = localStorage.getItem('word-game-ad-date');
+      if (savedDate !== today) {
+        setAdDailyCount(0);
+        localStorage.setItem('word-game-ad-count', 0);
+        localStorage.setItem('word-game-ad-date', today);
+      }
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
