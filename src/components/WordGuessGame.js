@@ -340,10 +340,15 @@ const WordGuessGame = () => {
               <RotateCcw size={12}/> Shuffle
             </button>
           </div>
-          {adDailyCount < 20 && now >= adNextAvailableTime && (
+          {adDailyCount < 20 && now >= adNextAvailableTime && !isAdLoading && (
             <button onClick={handleRewardAd} className="w-full px-4 py-2.5 bg-amber-400 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-1 active:scale-95 shadow-md">
-              <PlayCircle size={14}/> {isAdLoading ? 'WATCHING...' : 'GET FREE +200P'}
+              <PlayCircle size={14}/> GET FREE +200P
             </button>
+          )}
+          {isAdLoading && (
+             <button disabled className="w-full px-4 py-2.5 bg-amber-400 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-1 opacity-70 cursor-not-allowed shadow-inner">
+               <PlayCircle size={14}/> WATCHING...
+             </button>
           )}
         </div>
 
