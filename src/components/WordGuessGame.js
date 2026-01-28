@@ -40,8 +40,28 @@ const WordGuessGame = () => {
   const [message, setMessage] = useState('');
   const [isAdLoading, setIsAdLoading] = useState(false);
 
+  const [adDailyCount, setAdDailyCount] = useState(() => Number(localStorage.getItem('word-game-ad-count')) || 0);
+  const [adNextAvailableTime, setAdNextAvailableTime] = useState(() => Number(localStorage.getItem('word-game-ad-next-time')) || 0);
+  // Force re-render periodically to check ad availability
+  const [now, setNow] = useState(Date.now());
+
   const matchedWordsRef = useRef(new Set());
   const audioCtxRef = useRef(null);
+
+  useEffect(() => {
+    const today = new Date().toDateString();
+    const savedDate = localStorage.getItem('word-game-ad-date');
+    if (savedDate !== today) {
+      setAdDailyCount(0);
+      localStorage.setItem('word-game-ad-count', 0);
+      localStorage.setItem('word-game-ad-date', today);
+    }
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
@@ -172,8 +192,20 @@ const WordGuessGame = () => {
     playSound('click');
     setIsAdLoading(true);
     setTimeout(() => {
-      setScore(s => s + 200); setIsAdLoading(false);
-      playSound('reward'); setMessage('+200P Reward!');
+      setScore(s => s + 200);
+      setIsAdLoading(false);
+      playSound('reward');
+      setMessage('+200P Reward!');
+
+      const nextTime = Date.now() + 5 * 60 * 1000;
+      setAdDailyCount(c => {
+        const newCount = c + 1;
+        localStorage.setItem('word-game-ad-count', newCount);
+        return newCount;
+      });
+      setAdNextAvailableTime(nextTime);
+      localStorage.setItem('word-game-ad-next-time', nextTime);
+
       setTimeout(() => setMessage(''), 2000);
     }, 2500);
   };
@@ -205,23 +237,62 @@ const WordGuessGame = () => {
 
     let unmatchedLetters = selectedLetters.filter(l => !usedInMatch.has(l.id));
 
-    const components = wordResults.map((res, idx) => {
+    // Refactored Rendering Logic to hide word structure
+    const components = [];
+    let pendingUnsolvedLetters = [];
+
+    wordResults.forEach((res, idx) => {
       const isWordMatch = res.matchInfo !== null;
-      const displayLetters = isWordMatch ? res.matchInfo.letters : unmatchedLetters.splice(0, res.target.length);
-      return (
-        <div key={`word-${idx}`} className="flex flex-col items-center mx-2 my-1">
-          <div className="flex gap-1 items-center flex-wrap justify-center min-h-[32px]">
-            {displayLetters.map((l) => (
-              <span key={l.id} className={`text-2xl font-black transition-all ${isWordMatch ? 'text-green-500' : 'text-indigo-600'}`}>
-                {l.char.toUpperCase()}
-              </span>
-            ))}
-            {isWordMatch && <span className="text-green-500 ml-1 font-bold text-lg">✓</span>}
+
+      if (isWordMatch) {
+        // Flush any pending unsolved letters first
+        if (pendingUnsolvedLetters.length > 0) {
+          components.push(
+            <div key={`pending-${idx}`} className="flex flex-wrap gap-1 justify-center items-center">
+              {pendingUnsolvedLetters.map((l) => (
+                <span key={l.id} className="text-2xl font-black text-indigo-600 transition-all">
+                  {l.char.toUpperCase()}
+                </span>
+              ))}
+            </div>
+          );
+          pendingUnsolvedLetters = [];
+        }
+
+        // Render Solved Word (forces line break / distinct block)
+        components.push(
+          <div key={`word-${idx}`} className="w-full flex flex-col items-center my-1">
+            <div className="flex gap-1 items-center flex-wrap justify-center min-h-[32px]">
+              {res.matchInfo.letters.map((l) => (
+                <span key={l.id} className="text-2xl font-black text-green-500 transition-all">
+                  {l.char.toUpperCase()}
+                </span>
+              ))}
+              <span className="text-green-500 ml-1 font-bold text-lg">✓</span>
+            </div>
+            <div className="h-1 rounded-full mt-0.5 bg-green-400 w-full transition-all duration-500" />
           </div>
-          <div className={`h-1 rounded-full mt-0.5 transition-all duration-500 ${isWordMatch ? 'bg-green-400 w-full' : 'bg-indigo-50 w-12'}`} />
+        );
+      } else {
+        // Collect unsolved letters for this word but DO NOT show structure
+        // We take the letters that WOULD be assigned to this word
+        const lettersForThisWord = unmatchedLetters.splice(0, res.target.length);
+        pendingUnsolvedLetters.push(...lettersForThisWord);
+      }
+    });
+
+    // Flush any remaining pending unsolved letters
+    if (pendingUnsolvedLetters.length > 0) {
+      components.push(
+        <div key="pending-final" className="flex flex-wrap gap-1 justify-center items-center">
+          {pendingUnsolvedLetters.map((l) => (
+            <span key={l.id} className="text-2xl font-black text-indigo-600 transition-all">
+              {l.char.toUpperCase()}
+            </span>
+          ))}
         </div>
       );
-    });
+    }
 
     return { 
       renderedComponents: components, 
@@ -269,9 +340,11 @@ const WordGuessGame = () => {
               <RotateCcw size={12}/> Shuffle
             </button>
           </div>
-          <button onClick={handleRewardAd} className="w-full px-4 py-2.5 bg-amber-400 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-1 active:scale-95 shadow-md">
-            <PlayCircle size={14}/> {isAdLoading ? 'WATCHING...' : 'GET FREE +200P'}
-          </button>
+          {adDailyCount < 20 && now >= adNextAvailableTime && (
+            <button onClick={handleRewardAd} className="w-full px-4 py-2.5 bg-amber-400 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-1 active:scale-95 shadow-md">
+              <PlayCircle size={14}/> {isAdLoading ? 'WATCHING...' : 'GET FREE +200P'}
+            </button>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2 justify-center mb-6 min-h-[50px]">
