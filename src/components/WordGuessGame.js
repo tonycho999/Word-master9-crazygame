@@ -214,29 +214,51 @@ const WordGuessGame = () => {
   const targetWords = useMemo(() => currentWord.toLowerCase().split(/\s+/).filter(w => w.length > 0), [currentWord]);
   
   const { renderedComponents, allMatched } = useMemo(() => {
-    let tempSelected = [...selectedLetters];
+    const matches = new Array(targetWords.length).fill(null);
+    const usedIds = new Set();
     let matchedCount = 0;
-    let usedInMatch = new Set();
 
-    const components = targetWords.map((target, idx) => {
-      let matchInfo = null;
-      for (let i = 0; i <= tempSelected.length - target.length; i++) {
-        const slice = tempSelected.slice(i, i + target.length);
+    targetWords.forEach((target, idx) => {
+      for (let i = 0; i <= selectedLetters.length - target.length; i++) {
+        const slice = selectedLetters.slice(i, i + target.length);
+        const sliceIds = slice.map(l => l.id);
+
+        if (sliceIds.some(id => usedIds.has(id))) continue;
+
         if (slice.map(l => l.char).join('').toLowerCase() === target) {
-          matchInfo = slice;
-          slice.forEach(l => usedInMatch.add(l.id));
-          matchedCount++;
-          if (!matchedWordsRef.current.has(idx)) {
-            matchedWordsRef.current.add(idx); playSound('wordSuccess');
-          }
-          break;
+           matches[idx] = slice;
+           sliceIds.forEach(id => usedIds.add(id));
+           matchedCount++;
+           if (!matchedWordsRef.current.has(idx)) {
+             matchedWordsRef.current.add(idx); playSound('wordSuccess');
+           }
+           break;
         }
       }
+    });
+
+    const components = targetWords.map((target, idx) => {
+      const matchInfo = matches[idx];
       const isWordMatch = matchInfo !== null;
-      const display = isWordMatch ? matchInfo : selectedLetters.filter(l => !usedInMatch.has(l.id)).splice(0, target.length);
+
+      let display;
+      if (isWordMatch) {
+        display = matchInfo;
+      } else {
+        display = [];
+        let needed = target.length;
+        for (const l of selectedLetters) {
+          if (needed === 0) break;
+          if (!usedIds.has(l.id)) {
+            display.push(l);
+            usedIds.add(l.id);
+            needed--;
+          }
+        }
+      }
 
       return (
-        <div key={idx} className="flex flex-col items-center mb-2">
+        <div key={idx} className="flex flex-col items-center">
           <div className="flex gap-1 items-center min-h-[32px]">
             {display.map(l => (
               <span key={l.id} className={`text-2xl font-black ${isWordMatch ? 'text-green-500' : 'text-indigo-600'}`}>
@@ -314,7 +336,7 @@ const WordGuessGame = () => {
         </div>
 
         <div className={`w-full min-h-[120px] rounded-[1.5rem] flex flex-col justify-center items-center p-4 mb-6 border-2 border-dashed ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
-          {selectedLetters.length === 0 ? <span className="text-gray-300 font-black uppercase text-[10px] tracking-widest text-center">Tap letters below</span> : <div className="w-full">{renderedComponents}</div>}
+          {selectedLetters.length === 0 ? <span className="text-gray-300 font-black uppercase text-[10px] tracking-widest text-center">Tap letters below</span> : <div className="w-full flex flex-wrap justify-center gap-4">{renderedComponents}</div>}
           {(isCorrect || message) && <div className="text-green-500 font-black mt-2 text-xs animate-bounce">{message || 'CORRECT!'}</div>}
         </div>
 
