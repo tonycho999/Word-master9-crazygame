@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Trophy, Delete, ArrowRight, Lightbulb, RotateCcw, PlayCircle, Download } from 'lucide-react';
+import { Trophy, Delete, ArrowRight, Lightbulb, RotateCcw, PlayCircle, Download, Share, X } from 'lucide-react';
 import { wordDatabase, twoWordDatabase, threeWordDatabase } from '../data/wordDatabase';
 
 const fourWordDatabase = [
@@ -46,6 +46,8 @@ const WordGuessGame = () => {
 
   // PWA Install Prompt
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isIos, setIsIos] = useState(false);
+  const [showIosInstallModal, setShowIosInstallModal] = useState(false);
 
   const matchedWordsRef = useRef(new Set());
   const audioCtxRef = useRef(null);
@@ -57,8 +59,13 @@ const WordGuessGame = () => {
     }
   }, []);
 
-  // --- Install Prompt Listener ---
+  // --- Install Prompt Listener & OS Detection ---
   useEffect(() => {
+    // Detect iOS
+    const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.MSStream;
+    setIsIos(iOS);
+
+    // Android/Desktop PWA prompt
     const handler = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -68,13 +75,16 @@ const WordGuessGame = () => {
   }, []);
 
   const handleInstallClick = () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then((choiceResult) => {
-      if (choiceResult.outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
-    });
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          setDeferredPrompt(null);
+        }
+      });
+    } else if (isIos) {
+      setShowIosInstallModal(true);
+    }
   };
 
   // --- 오디오 재생 ---
@@ -319,7 +329,7 @@ const WordGuessGame = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 relative">
       <div className="bg-white rounded-[2rem] p-6 w-full max-w-md shadow-2xl flex flex-col items-center border-t-8 border-indigo-500">
         <div className="w-full flex justify-between items-center mb-4 font-black text-indigo-600">
           <span>LEVEL {level}</span>
@@ -345,7 +355,7 @@ const WordGuessGame = () => {
             </button>
           </div>
 
-          {deferredPrompt && (
+          {(deferredPrompt || isIos) && (
             <button onClick={handleInstallClick} className="w-full px-4 py-2.5 bg-indigo-500 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-1 active:scale-95 shadow-sm">
               <Download size={14}/> INSTALL APP
             </button>
@@ -389,6 +399,29 @@ const WordGuessGame = () => {
           )}
         </div>
       </div>
+
+      {/* iOS Install Modal */}
+      {showIosInstallModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setShowIosInstallModal(false)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm flex flex-col items-center shadow-2xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between w-full items-center mb-4">
+              <h3 className="font-black text-xl text-gray-900">Install on iOS</h3>
+              <button onClick={() => setShowIosInstallModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24}/></button>
+            </div>
+            <div className="space-y-4 text-center">
+              <p className="text-sm font-medium text-gray-600">To install this app on your iPhone or iPad:</p>
+              <div className="flex items-center justify-center gap-2 text-indigo-600 font-bold bg-indigo-50 p-3 rounded-xl">
+                <span>1. Tap the Share button</span>
+                <Share size={20} />
+              </div>
+              <div className="flex items-center justify-center gap-2 text-indigo-600 font-bold bg-indigo-50 p-3 rounded-xl">
+                <span>2. Select 'Add to Home Screen'</span>
+              </div>
+            </div>
+            <button onClick={() => setShowIosInstallModal(false)} className="mt-6 w-full py-3 bg-indigo-600 text-white rounded-xl font-black">GOT IT!</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
