@@ -214,40 +214,52 @@ const WordGuessGame = () => {
   const targetWords = useMemo(() => currentWord.toLowerCase().split(/\s+/).filter(w => w.length > 0), [currentWord]);
   
   const { renderedComponents, allMatched } = useMemo(() => {
-    let tempSelected = [...selectedLetters];
+    let availableLetters = [...selectedLetters];
     let matchedCount = 0;
-    let usedInMatch = new Set();
 
-    const componentData = targetWords.map((target, idx) => {
-      let matchInfo = null;
-      for (let i = 0; i <= tempSelected.length - target.length; i++) {
-        const slice = tempSelected.slice(i, i + target.length);
+    // Pass 1: Find Matches
+    const wordStates = targetWords.map((target, idx) => {
+      let isMatch = false;
+      let display = null;
+
+      for (let i = 0; i <= availableLetters.length - target.length; i++) {
+        const slice = availableLetters.slice(i, i + target.length);
         if (slice.map(l => l.char).join('').toLowerCase() === target) {
-          matchInfo = slice;
-          slice.forEach(l => usedInMatch.add(l.id));
+          isMatch = true;
+          display = availableLetters.splice(i, target.length);
           matchedCount++;
           if (!matchedWordsRef.current.has(idx)) {
-            matchedWordsRef.current.add(idx); playSound('wordSuccess');
+            matchedWordsRef.current.add(idx);
+            playSound('wordSuccess');
           }
           break;
         }
       }
-      const isWordMatch = matchInfo !== null;
-      const display = isWordMatch ? matchInfo : selectedLetters.filter(l => !usedInMatch.has(l.id)).splice(0, target.length);
+      return { isMatch, display };
+    });
+
+    // Pass 2: Assign Remaining to Unsolved
+    const componentData = wordStates.map((state, idx) => {
+      let display = state.display;
+      if (!state.isMatch) {
+        const target = targetWords[idx];
+        const needed = target.length;
+        display = availableLetters.splice(0, needed);
+      }
 
       return {
-        isWordMatch,
+        isWordMatch: state.isMatch,
         component: (
           <div key={idx} className="flex flex-col items-center mb-2">
             <div className="flex gap-1 items-center min-h-[32px]">
               {display.map(l => (
-                <span key={l.id} className={`text-2xl font-black ${isWordMatch ? 'text-green-500' : 'text-indigo-600'}`}>
+                <span key={l.id} className={`text-2xl font-black ${state.isMatch ? 'text-green-500' : 'text-indigo-600'}`}>
                   {l.char.toUpperCase()}
                 </span>
               ))}
-              {isWordMatch && <span className="text-green-500 ml-1">✓</span>}
+              {state.isMatch && <span className="text-green-500 ml-1">✓</span>}
             </div>
-            <div className={`h-1 rounded-full mt-0.5 ${isWordMatch ? 'bg-green-400 w-full' : 'bg-indigo-50 w-12'}`} />
+            <div className={`h-1 rounded-full mt-0.5 ${state.isMatch ? 'bg-green-400 w-full' : 'bg-indigo-50 w-12'}`} />
           </div>
         )
       };
@@ -255,7 +267,7 @@ const WordGuessGame = () => {
 
     const components = componentData.map((data, i) => {
       const nextData = componentData[i + 1];
-      const shouldBreak = data.isWordMatch && nextData && nextData.isWordMatch;
+      const shouldBreak = data.isWordMatch && nextData;
       return (
         <React.Fragment key={i}>
           {data.component}
