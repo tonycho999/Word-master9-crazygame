@@ -1,20 +1,21 @@
+
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7272957295128241"
-     crossorigin="anonymous"></script>
-    <meta charset="utf-8" />
-    <link rel="icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#4f46e5" />
+  <head>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7272957295128241"
+     crossorigin="anonymous"></script>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#4f46e5" />
+    
+    <link rel="manifest" href="/manifest.json" />
 
-    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/logo192.png">
 
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="/logo192.png">
-    
-    <title>Word-Master9 - Free Online Word Guess Puzzle & Vocabulary Game</title>
+     <title>Word-Master9 - Free Online Word Guess Puzzle & Vocabulary Game</title>
     
     <meta name="description" content="Challenge your brain with Word Scramble Master! A free online word puzzle game to improve your vocabulary. Play now without download." />
     <meta name="keywords" content="Free Word Puzzle, Vocabulary Game, Online Word Guess, Word Master, Brain Game, English Word Game, 영어 퍼즐 게임, 영어 단어 게임, 무료 퍼즐 게임, 단어 맞추기, Word Scramble" />
@@ -24,31 +25,31 @@
     <meta property="og:description" content="Can you guess all the words? Boost your vocabulary in this fun, free game!" />
     <meta property="og:url" content="https://word-master9.vercel.app" />
     <meta property="og:image" content="/logo512.png" />
-   
-    <link rel="apple-touch-icon" href="/logo192.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 배경색이 잘리는 것을 방지하기 위한 강제 스타일 */
+    body, html, #root {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #4f46e5 !important;
+    }
+  </style>
+  </head>
+  <body>
+    <div id="root"></div>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      /* 배경색이 잘리는 것을 방지하기 위한 강제 스타일 */
-      body, html, #root {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        background-color: #4f46e5 !important;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js')
-            .then(reg => console.log('SW Registered'))
-            .catch(err => console.error('SW Registration Failed', err));
-        });
-      }
-    </script>
-  </body>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          // 등록 경로를 명확히 지정
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('SW Registered'))
+            .catch(err => console.error('SW Registration Failed', err));
+        });
+      }
+    </script>
+  </body>
 </html>
+이 코드에 너가 제안한 키워드를 넣어줘
