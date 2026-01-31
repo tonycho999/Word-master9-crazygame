@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Trophy, Delete, ArrowRight, Lightbulb, RotateCcw, PlayCircle } from 'lucide-react';
+import { Trophy, Delete, ArrowRight, Lightbulb, RotateCcw, PlayCircle, Download } from 'lucide-react';
 import { wordDatabase, twoWordDatabase, threeWordDatabase } from '../data/wordDatabase';
 
 const fourWordDatabase = [
@@ -44,8 +44,38 @@ const WordGuessGame = () => {
   const [adClickCount, setAdClickCount] = useState(0);
   const [isAdLoading, setIsAdLoading] = useState(false);
 
+  // PWA Install Prompt
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
   const matchedWordsRef = useRef(new Set());
   const audioCtxRef = useRef(null);
+
+  // --- Orientation Lock ---
+  useEffect(() => {
+    if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+       window.screen.orientation.lock('portrait').catch(e => console.log('Orientation lock failed:', e));
+    }
+  }, []);
+
+  // --- Install Prompt Listener ---
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    });
+  };
 
   // --- 오디오 재생 ---
   const playSound = useCallback(async (type) => {
@@ -210,15 +240,17 @@ const WordGuessGame = () => {
     }).join(' / ')}`;
   }, [currentWord, hintLevel]);
 
-  // --- 렌더링 로직 ---
+  // --- 렌더링 로직 (Refactored) ---
   const targetWords = useMemo(() => currentWord.toLowerCase().split(/\s+/).filter(w => w.length > 0), [currentWord]);
   
-  const { renderedComponents, allMatched } = useMemo(() => {
+  const { solvedComponents, inputStreamComponent, allMatched } = useMemo(() => {
     let tempSelected = [...selectedLetters];
     let matchedCount = 0;
     let usedInMatch = new Set();
+    const solvedWordsData = [];
 
-    const components = targetWords.map((target, idx) => {
+    // 1. Identify Matches
+    targetWords.forEach((target, idx) => {
       let matchInfo = null;
       for (let i = 0; i <= tempSelected.length - target.length; i++) {
         const slice = tempSelected.slice(i, i + target.length);
@@ -232,26 +264,42 @@ const WordGuessGame = () => {
           break;
         }
       }
-      const isWordMatch = matchInfo !== null;
-      const display = isWordMatch ? matchInfo : selectedLetters.filter(l => !usedInMatch.has(l.id)).splice(0, target.length);
 
-      return (
-        <div key={idx} className="flex flex-col items-center mb-2">
-          <div className="flex gap-1 items-center min-h-[32px]">
-            {display.map(l => (
-              <span key={l.id} className={`text-2xl font-black ${isWordMatch ? 'text-green-500' : 'text-indigo-600'}`}>
-                {l.char.toUpperCase()}
-              </span>
-            ))}
-            {isWordMatch && <span className="text-green-500 ml-1">✓</span>}
-          </div>
-          <div className={`h-1 rounded-full mt-0.5 ${isWordMatch ? 'bg-green-400 w-full' : 'bg-indigo-50 w-12'}`} />
-        </div>
-      );
+      if (matchInfo) {
+        solvedWordsData.push({ idx, target, chars: matchInfo });
+      }
     });
 
+    // 2. Render Solved Words (Each on a new line/block)
+    const solved = solvedWordsData.map((item) => (
+      <div key={item.idx} className="flex flex-col items-center mb-2 w-full">
+        <div className="flex gap-1 items-center justify-center min-h-[32px]">
+          {item.chars.map(l => (
+            <span key={l.id} className="text-2xl font-black text-green-500">
+              {l.char.toUpperCase()}
+            </span>
+          ))}
+          <span className="text-green-500 ml-1">✓</span>
+        </div>
+        <div className="h-1 rounded-full mt-0.5 bg-green-400 w-full" />
+      </div>
+    ));
+
+    // 3. Render Input Stream (Remaining letters, continuous, no breaks)
+    const remaining = selectedLetters.filter(l => !usedInMatch.has(l.id));
+    const inputStream = (
+      <div className="flex flex-wrap justify-center gap-1 min-h-[32px]">
+        {remaining.map(l => (
+          <span key={l.id} className="text-2xl font-black text-indigo-600">
+            {l.char.toUpperCase()}
+          </span>
+        ))}
+      </div>
+    );
+
     return { 
-      renderedComponents: components, 
+      solvedComponents: solved,
+      inputStreamComponent: inputStream,
       allMatched: matchedCount === targetWords.length && selectedLetters.length === currentWord.replace(/\s/g, '').length 
     };
   }, [selectedLetters, targetWords, currentWord, playSound]);
@@ -296,6 +344,13 @@ const WordGuessGame = () => {
               <RotateCcw size={12}/> Shuffle
             </button>
           </div>
+
+          {deferredPrompt && (
+            <button onClick={handleInstallClick} className="w-full px-4 py-2.5 bg-indigo-500 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-1 active:scale-95 shadow-sm">
+              <Download size={14}/> INSTALL APP
+            </button>
+          )}
+
           {isAdVisible && adClickCount < 20 ? (
             <button onClick={handleRewardAd} className="w-full px-4 py-2.5 bg-amber-400 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-1 active:scale-95">
               <PlayCircle size={14}/> {isAdLoading ? 'WATCHING...' : `GET FREE +200P (${adClickCount}/20)`}
@@ -314,7 +369,12 @@ const WordGuessGame = () => {
         </div>
 
         <div className={`w-full min-h-[120px] rounded-[1.5rem] flex flex-col justify-center items-center p-4 mb-6 border-2 border-dashed ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
-          {selectedLetters.length === 0 ? <span className="text-gray-300 font-black uppercase text-[10px] tracking-widest text-center">Tap letters below</span> : <div className="w-full">{renderedComponents}</div>}
+          {selectedLetters.length === 0 ? <span className="text-gray-300 font-black uppercase text-[10px] tracking-widest text-center">Tap letters below</span> :
+            <div className="w-full flex flex-col items-center">
+              {solvedComponents}
+              {inputStreamComponent}
+            </div>
+          }
           {(isCorrect || message) && <div className="text-green-500 font-black mt-2 text-xs animate-bounce">{message || 'CORRECT!'}</div>}
         </div>
 
