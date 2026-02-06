@@ -9,7 +9,6 @@ const WordGuessGame = () => {
   const [score, setScore] = useState(() => Number(localStorage.getItem('word-game-score')) || 300);
   const [currentWord, setCurrentWord] = useState(() => localStorage.getItem('word-game-current-word') || '');
   const [category, setCategory] = useState(() => localStorage.getItem('word-game-category') || '');
-  const [wordType, setWordType] = useState(() => localStorage.getItem('word-game-word-type') || 'Normal');
   
   const [scrambledLetters, setScrambledLetters] = useState(() => {
     try { return JSON.parse(localStorage.getItem('word-game-scrambled')) || []; } catch { return []; }
@@ -80,11 +79,10 @@ const WordGuessGame = () => {
     localStorage.setItem('word-game-score', score);
     localStorage.setItem('word-game-current-word', currentWord);
     localStorage.setItem('word-game-category', category);
-    localStorage.setItem('word-game-word-type', wordType);
     localStorage.setItem('word-game-scrambled', JSON.stringify(scrambledLetters));
     localStorage.setItem('word-game-selected', JSON.stringify(selectedLetters));
     localStorage.setItem('word-game-hint-level', hintLevel);
-  }, [level, score, currentWord, category, wordType, scrambledLetters, selectedLetters, hintLevel]);
+  }, [level, score, currentWord, category, scrambledLetters, selectedLetters, hintLevel]);
 
   // --- 광고 쿨타임 로직 (10분) ---
   useEffect(() => {
@@ -146,7 +144,7 @@ const WordGuessGame = () => {
 
     setCurrentWord(selectedPick.word);
     setCategory(selectedPick.category);
-    setWordType(selectedPick.type || 'Normal');
+    // wordType은 이제 UI에 직접 안 쓰지만 호환성을 위해 둠 (필요 없으면 삭제 가능)
 
     // 글자 섞기
     const wordStr = selectedPick.word;
@@ -164,6 +162,14 @@ const WordGuessGame = () => {
   }, [level]);
 
   useEffect(() => { if (!currentWord) loadNewWord(); }, [currentWord, loadNewWord]);
+
+  // --- [수정됨] 단어 개수 계산 로직 ---
+  // "Normal" 대신 "1 WORD", "2 WORDS" 표시를 위해 계산
+  const wordCountDisplay = useMemo(() => {
+    if (!currentWord) return '';
+    const count = currentWord.trim().split(/\s+/).length;
+    return `${count} WORD${count > 1 ? 'S' : ''}`; // 1 WORD, 2 WORDS ...
+  }, [currentWord]);
 
   // --- 힌트 로직 (3단계) ---
   const handleHint = () => {
@@ -287,7 +293,7 @@ const WordGuessGame = () => {
     }
   }, [selectedLetters, currentWord, isCorrect, playSound]);
 
-  // --- [핵심 수정] 렌더링: 정답 영역 (자리수 힌트 없음) ---
+  // --- 렌더링: 정답 영역 (자리수 힌트 없음) ---
   const renderedAnswerArea = useMemo(() => {
     // 1. Flash 힌트(3단계) 발동 시: 정답 구조를 잠깐 보여줌
     if (isFlashing) {
@@ -348,10 +354,11 @@ const WordGuessGame = () => {
           <span className="flex items-center gap-1"><Trophy size={18} className="text-yellow-500"/> {score}</span>
         </div>
 
-        {/* 1. 카테고리 */}
+        {/* 1. 카테고리 & 단어 수 표시 */}
         <div className="text-center mb-5 w-full">
+           {/* [수정됨] wordType 대신 단어 개수 표시 */}
            <span className="inline-block py-1 px-3 bg-indigo-100 text-indigo-600 text-xs font-black rounded-full uppercase tracking-widest mb-1">
-             {wordType}
+             {wordCountDisplay}
            </span>
            <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight">{category}</h2>
            {/* 힌트 텍스트 */}
