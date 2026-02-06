@@ -103,7 +103,7 @@ const WordGuessGame = () => {
   const handleLogin = async () => { playSound('click'); await loginWithGoogle(); };
   const handleLogout = async () => { playSound('click'); await logout(); setUser(null); setMessage('LOGGED OUT'); setTimeout(() => setMessage(''), 1500); };
 
-  // --- 데이터 저장 (백업용) ---
+  // --- 데이터 저장 ---
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
     localStorage.setItem('word-game-score', score);
@@ -113,7 +113,8 @@ const WordGuessGame = () => {
     localStorage.setItem('word-game-scrambled', JSON.stringify(scrambledLetters));
     localStorage.setItem('word-game-selected', JSON.stringify(selectedLetters));
     localStorage.setItem('word-game-hint-level', hintLevel);
-    // 평소에는 1초 딜레이 저장
+    
+    // (자동 저장은 백업용으로 유지)
     if (user) {
         const timer = setTimeout(() => { saveProgress(user.id, level, score); }, 1000);
         return () => clearTimeout(timer);
@@ -231,27 +232,18 @@ const WordGuessGame = () => {
   const handleReset = () => { playSound('click'); setScrambledLetters(prev => [...prev, ...selectedLetters]); setSelectedLetters([]); };
   const handleBackspace = () => { if(selectedLetters.length > 0) { playSound('click'); const last = selectedLetters[selectedLetters.length-1]; setSelectedLetters(prev => prev.slice(0, -1)); setScrambledLetters(prev => [...prev, last]); } };
 
-  // --- [확실한 수정] 다음 레벨 버튼 클릭 시 저장 디버깅 ---
   const processNextLevel = async () => {
     playSound('click');
-    
-    // 1. 값 미리 계산
     const nextLevel = level + 1;
     const nextScore = score + 50;
 
-    // 2. 상태 업데이트
     setScore(nextScore);
     setLevel(nextLevel);
     setCurrentWord('');
 
-    // 3. DB 저장 및 확인
     if (user) {
-        console.log("DB 저장 시도:", user.id, nextLevel, nextScore); // 개발자 도구 확인용
         await saveProgress(user.id, nextLevel, nextScore);
-        // 저장이 완료되었다는 메시지 (테스트용)
-        console.log("DB 저장 완료!");
-    } else {
-        console.log("로그인 상태가 아니라서 저장 안 됨");
+        console.log("DB 저장 완료");
     }
   };
 
@@ -278,6 +270,7 @@ const WordGuessGame = () => {
     } else { setIsCorrect(false); }
   }, [selectedLetters, currentWord, isCorrect, playSound, completedWordCount]);
 
+  // --- [수정된 부분] 렌더링 로직 ---
   const renderedAnswerArea = useMemo(() => {
     if (isFlashing) {
          return (
@@ -296,13 +289,20 @@ const WordGuessGame = () => {
     }
     const words = currentWord.split(' ');
     let letterIndex = 0;
+
+    // [핵심] 정답이 아닐 때(!isCorrect)는 flex-wrap으로 가로 배치, 정답일 때는 flex-col로 세로(단어별) 배치
+    const containerClass = isCorrect 
+      ? "flex flex-col gap-3 w-full items-center" 
+      : "flex flex-wrap gap-3 md:gap-5 w-full justify-center items-center";
+
     return (
-      <div className="flex flex-col gap-3 w-full items-center">
+      <div className={containerClass}>
         {words.map((word, wIdx) => {
            const wordLen = word.length;
            const wordLetters = selectedLetters.slice(letterIndex, letterIndex + wordLen);
            letterIndex += wordLen;
            const isThisWordComplete = wordLetters.map(l => l.char).join('').toLowerCase() === word.toLowerCase();
+           
            return (
              <div key={wIdx} className="flex gap-2 justify-center flex-wrap min-h-[50px]">
                 {wordLetters.map((l, idx) => (
