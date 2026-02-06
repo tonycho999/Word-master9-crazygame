@@ -25,7 +25,6 @@ const WordGuessGame = () => {
   const [message, setMessage] = useState('');
   const [isFlashing, setIsFlashing] = useState(false);
   
-  // [NEW] 맞춘 단어 개수 추적용 (중간 칭찬 메시지용)
   const [completedWordCount, setCompletedWordCount] = useState(0);
 
   const [isAdVisible, setIsAdVisible] = useState(true);
@@ -61,7 +60,7 @@ const WordGuessGame = () => {
           o.connect(g); g.connect(ctx.destination); o.frequency.value = f;
           g.gain.setValueAtTime(0.1, ctx.currentTime + i*0.08); o.start(ctx.currentTime + i*0.08); o.stop(ctx.currentTime + 0.4);
         });
-      } else if (type === 'partialSuccess') { // [NEW] 부분 정답 사운드
+      } else if (type === 'partialSuccess') {
         osc.frequency.setValueAtTime(600, ctx.currentTime);
         gain.gain.setValueAtTime(0.1, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
@@ -105,7 +104,7 @@ const WordGuessGame = () => {
   const handleLogin = async () => { playSound('click'); await loginWithGoogle(); };
   const handleLogout = async () => { playSound('click'); await logout(); setUser(null); setMessage('LOGGED OUT'); setTimeout(() => setMessage(''), 1500); };
 
-  // --- 데이터 저장 ---
+  // --- 데이터 저장 (useEffect는 백업용으로 유지) ---
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
     localStorage.setItem('word-game-score', score);
@@ -117,6 +116,7 @@ const WordGuessGame = () => {
     localStorage.setItem('word-game-hint-level', hintLevel);
 
     if (user) {
+        // 평소에는 1초 딜레이 (너무 잦은 저장 방지)
         const timer = setTimeout(() => { saveProgress(user.id, level, score); }, 1000);
         return () => clearTimeout(timer);
     }
@@ -179,7 +179,8 @@ const WordGuessGame = () => {
 
     setCurrentWord(selectedPick.word);
     setCategory(selectedPick.category);
-    setWordType(selectedPick.type || 'Normal');
+    // [중요] 타입이 없으면 'Normal'로 설정, 있으면 대문자 변환
+    setWordType(selectedPick.type ? selectedPick.type.toUpperCase() : 'NORMAL');
 
     const wordStr = selectedPick.word;
     const chars = wordStr.replace(/\s/g, '').split('').map((char, i) => ({ 
@@ -192,7 +193,7 @@ const WordGuessGame = () => {
     setHintLevel(0);
     setIsFlashing(false);
     setMessage('');
-    setCompletedWordCount(0); // 초기화
+    setCompletedWordCount(0);
     matchedWordsRef.current = new Set();
   }, [level]);
 
@@ -278,36 +279,43 @@ const WordGuessGame = () => {
     }
   };
 
+  // --- [수정된 부분] 다음 레벨 버튼 클릭 시 즉시 저장 ---
   const processNextLevel = () => {
     playSound('click');
-    setScore(s => s + 50);
-    setLevel(l => l + 1);
+    
+    // 1. 다음 값 미리 계산
+    const nextLevel = level + 1;
+    const nextScore = score + 50;
+
+    // 2. 상태 업데이트
+    setScore(nextScore);
+    setLevel(nextLevel);
     setCurrentWord('');
+
+    // 3. [중요] DB에 즉시 저장 (1초 기다리지 않음)
+    if (user) {
+        saveProgress(user.id, nextLevel, nextScore);
+    }
   };
 
-  // [NEW] 정답 체크 로직 (부분 정답 + 전체 정답)
+  // --- 정답 체크 로직 ---
   useEffect(() => {
     if (!currentWord) return;
 
-    const words = currentWord.split(' '); // ["GOLF", "CLUB"]
+    const words = currentWord.split(' ');
     let currentCheckIndex = 0;
     let matchedCount = 0;
 
-    // 단어별로 확인
     words.forEach(word => {
         const wordLen = word.length;
         const enteredChunk = selectedLetters.slice(currentCheckIndex, currentCheckIndex + wordLen);
         const enteredStr = enteredChunk.map(l => l.char).join('').toLowerCase();
-        
-        if (enteredStr === word.toLowerCase()) {
-            matchedCount++;
-        }
+        if (enteredStr === word.toLowerCase()) matchedCount++;
         currentCheckIndex += wordLen;
     });
 
-    // 부분 정답 메시지 (이전보다 맞춘 개수가 늘었을 때)
     if (matchedCount > completedWordCount) {
-        if (matchedCount < words.length) { // 전체 정답이 아닐 때만
+        if (matchedCount < words.length) { 
             playSound('partialSuccess');
             setMessage('NICE!');
             setTimeout(() => setMessage(''), 1000);
@@ -315,7 +323,6 @@ const WordGuessGame = () => {
     }
     setCompletedWordCount(matchedCount);
 
-    // 전체 정답 체크
     const targetClean = currentWord.replace(/\s/g, '').toLowerCase();
     const selectedClean = selectedLetters.map(l => l.char).join('').toLowerCase();
     
@@ -329,9 +336,7 @@ const WordGuessGame = () => {
     }
   }, [selectedLetters, currentWord, isCorrect, playSound, completedWordCount]);
 
-  // [NEW] 렌더링: 단어별로 줄바꿈 처리
   const renderedAnswerArea = useMemo(() => {
-    // 1. Flash 힌트 (기존 유지)
     if (isFlashing) {
          return (
              <div className="flex flex-col gap-3 items-center w-full animate-pulse">
@@ -348,7 +353,6 @@ const WordGuessGame = () => {
          );
     }
 
-    // 2. 입력된 글자 렌더링 (단어별로 줄 바꿈)
     const words = currentWord.split(' ');
     let letterIndex = 0;
 
@@ -356,14 +360,10 @@ const WordGuessGame = () => {
       <div className="flex flex-col gap-3 w-full items-center">
         {words.map((word, wIdx) => {
            const wordLen = word.length;
-           // 현재 단어에 해당하는 입력값 잘라내기
            const wordLetters = selectedLetters.slice(letterIndex, letterIndex + wordLen);
            letterIndex += wordLen;
-           
-           // 이 단어가 완성됐는지 확인 (색상 변경용)
            const isThisWordComplete = wordLetters.map(l => l.char).join('').toLowerCase() === word.toLowerCase();
 
-           // 단어 렌더링
            return (
              <div key={wIdx} className="flex gap-2 justify-center flex-wrap min-h-[50px]">
                 {wordLetters.map((l, idx) => (
@@ -376,21 +376,16 @@ const WordGuessGame = () => {
                         text-2xl font-black 
                         transition-all duration-200 -translate-y-1
                         ${isCorrect ? '!border-green-500 !bg-green-50 !text-green-600' : 
-                          isThisWordComplete ? 'border-green-400 bg-green-50 text-green-600' : // 부분 정답 시 초록색
+                          isThisWordComplete ? 'border-green-400 bg-green-50 text-green-600' :
                           'border-indigo-600 bg-indigo-50 text-indigo-800'}
                       `}
                     >
                       {l.char.toUpperCase()}
                     </div>
                 ))}
-                {/* 입력 안 된 부분은 빈칸을 렌더링하지 않음 (유저 요청). 
-                   대신 단어 줄은 유지됨.
-                */}
              </div>
            );
         })}
-        
-        {/* 아무것도 입력 안 했을 때 안내 문구 */}
         {selectedLetters.length === 0 && (
             <span className="text-gray-300 text-xs font-bold tracking-widest animate-pulse uppercase mt-2">
                 Tap letters to answer
@@ -421,11 +416,19 @@ const WordGuessGame = () => {
           </div>
         </div>
 
-        {/* 1. 카테고리 */}
+        {/* 1. 카테고리 & 배지 */}
         <div className="text-center mb-5 w-full">
-           <span className="inline-block py-1 px-3 bg-indigo-100 text-indigo-600 text-xs font-black rounded-full uppercase tracking-widest mb-1">
-             {wordCountDisplay} • {wordType}
-           </span>
+           <div className="flex justify-center gap-2 mb-2">
+             <span className="py-1 px-3 bg-gray-100 text-gray-500 text-[10px] font-black rounded-full uppercase tracking-widest">
+               {wordCountDisplay}
+             </span>
+             <span className={`py-1 px-3 text-[10px] font-black rounded-full uppercase tracking-widest ${
+               wordType === 'PHRASE' ? 'bg-rose-100 text-rose-500' : 'bg-indigo-100 text-indigo-500'
+             }`}>
+               {wordType}
+             </span>
+           </div>
+
            <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight">{category}</h2>
            {hintLevel > 0 && (
              <div className="text-indigo-500 font-bold text-lg mt-2 tracking-widest animate-bounce bg-indigo-50 py-1 px-4 rounded-lg inline-block">
