@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Trophy, Delete, ArrowRight, Lightbulb, RotateCcw, PlayCircle, RefreshCcw } from 'lucide-react';
-// 5단어 데이터와 설정(LEVEL_CONFIG)까지 모두 import 합니다.
+// 데이터 파일에서 모든 DB와 설정을 가져옵니다.
 import { wordDatabase, twoWordDatabase, threeWordDatabase, fourWordDatabase, fiveWordDatabase, LEVEL_CONFIG } from '../data/wordDatabase';
 
 const WordGuessGame = () => {
@@ -86,7 +86,7 @@ const WordGuessGame = () => {
     localStorage.setItem('word-game-hint-level', hintLevel);
   }, [level, score, currentWord, category, wordType, scrambledLetters, selectedLetters, hintLevel]);
 
-  // --- [수정됨] 광고 쿨타임 로직 (10분) ---
+  // --- 광고 쿨타임 로직 (10분) ---
   useEffect(() => {
     const today = new Date().toLocaleDateString();
     const savedDate = localStorage.getItem('ad-click-date');
@@ -115,6 +115,7 @@ const WordGuessGame = () => {
 
   // --- 단어 로드 ---
   const loadNewWord = useCallback(() => {
+    // LEVEL_CONFIG 적용
     const config = (LEVEL_CONFIG && LEVEL_CONFIG.find(c => level <= c.maxLevel)) 
                    || (LEVEL_CONFIG ? LEVEL_CONFIG[LEVEL_CONFIG.length - 1] : { probs: { 1: 100 } });
 
@@ -138,6 +139,7 @@ const WordGuessGame = () => {
 
     if (!targetPool || targetPool.length === 0) targetPool = wordDatabase;
 
+    // 결정론적 랜덤 (같은 레벨 = 같은 문제)
     const magicNumber = 17; 
     const fixedIndex = ((level * magicNumber)) % targetPool.length;
     const selectedPick = targetPool[fixedIndex] || wordDatabase[0];
@@ -146,6 +148,7 @@ const WordGuessGame = () => {
     setCategory(selectedPick.category);
     setWordType(selectedPick.type || 'Normal');
 
+    // 글자 섞기
     const wordStr = selectedPick.word;
     const chars = wordStr.replace(/\s/g, '').split('').map((char, i) => ({ 
       char, id: `l-${Date.now()}-${i}-${Math.random()}` 
@@ -200,6 +203,7 @@ const WordGuessGame = () => {
     }
   };
 
+  // 힌트 표시용 텍스트 (카테고리 아래)
   const hintDisplay = useMemo(() => {
     if (hintLevel === 0 || !currentWord) return null;
     const words = currentWord.split(/\s+/);
@@ -219,9 +223,8 @@ const WordGuessGame = () => {
     setScrambledLetters(prev => [...prev].sort(() => Math.random() - 0.5));
   };
 
-  // --- [수정됨] 광고 핸들러 (10회 제한, 10분 쿨타임) ---
   const handleRewardAd = () => {
-    // 하루 10회 제한
+    // 10회 제한
     if (adClickCount >= 10) return;
     
     playSound('click');
@@ -238,8 +241,7 @@ const WordGuessGame = () => {
       setMessage('+200P Reward!');
       setTimeout(() => setMessage(''), 2000);
       
-      // 10분 쿨타임 = 10 * 60 * 1000
-      // 횟수 제한(10회) 미만일 때만 다시 표시 예약
+      // 10분 쿨타임
       if (newCount < 10) setTimeout(() => setIsAdVisible(true), 10 * 60 * 1000);
     }, 2500);
   };
@@ -272,6 +274,7 @@ const WordGuessGame = () => {
     setCurrentWord('');
   };
 
+  // 정답 체크
   useEffect(() => {
     const targetClean = currentWord.replace(/\s/g, '').toLowerCase();
     const selectedClean = selectedLetters.map(l => l.char).join('').toLowerCase();
@@ -284,8 +287,9 @@ const WordGuessGame = () => {
     }
   }, [selectedLetters, currentWord, isCorrect, playSound]);
 
-  // --- 렌더링 영역 ---
+  // --- [핵심 수정] 렌더링: 정답 영역 (자리수 힌트 없음) ---
   const renderedAnswerArea = useMemo(() => {
+    // 1. Flash 힌트(3단계) 발동 시: 정답 구조를 잠깐 보여줌
     if (isFlashing) {
          return (
              <div className="flex flex-col gap-3 items-center w-full animate-pulse">
@@ -302,39 +306,37 @@ const WordGuessGame = () => {
          );
     }
 
-    const words = currentWord.split(' ');
-    let globalCharIndex = 0;
-
+    // 2. 평상시: 빈칸 없이 '선택한 글자'만 보여줌
     return (
-      <div className="flex flex-col gap-3 items-center w-full">
-        {words.map((word, wordIndex) => (
-          <div key={wordIndex} className="flex gap-1.5 justify-center flex-wrap">
-            {word.split('').map((char, charIndex) => {
-              const selectedCharObj = selectedLetters[globalCharIndex];
-              const isFilled = selectedCharObj !== undefined;
-              globalCharIndex++; 
-              return (
+      <div className="flex flex-wrap gap-2 justify-center items-center min-h-[60px]">
+        {selectedLetters.length === 0 ? (
+            // 아무것도 안 눌렀을 때 표시
+            <span className="text-gray-300 text-xs font-bold tracking-widest animate-pulse uppercase">
+                Tap letters to answer
+            </span>
+        ) : (
+            // 선택한 글자들만 나열 (자리수 힌트 X)
+            selectedLetters.map((l, idx) => (
                 <div 
-                  key={`${wordIndex}-${charIndex}`} 
+                  key={idx} 
                   className={`
                     w-10 h-12 sm:w-12 sm:h-14 
                     border-b-4 rounded-t-lg
                     flex items-center justify-center 
                     text-2xl font-black 
                     transition-all duration-200
-                    ${isFilled ? 'border-indigo-600 bg-indigo-50 text-indigo-800 -translate-y-1' : 'border-gray-200 bg-white'}
+                    border-indigo-600 bg-indigo-50 text-indigo-800 -translate-y-1
                     ${isCorrect ? '!border-green-500 !bg-green-50 !text-green-600' : ''}
                   `}
                 >
-                  {isFilled ? selectedCharObj.char.toUpperCase() : ''}
+                  {l.char.toUpperCase()}
                 </div>
-              );
-            })}
-          </div>
-        ))}
+            ))
+        )}
       </div>
     );
   }, [currentWord, selectedLetters, isCorrect, isFlashing]);
+
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none">
@@ -373,7 +375,7 @@ const WordGuessGame = () => {
             </button>
         </div>
 
-        {/* 3. 광고 버튼 (10회 제한) */}
+        {/* 3. 광고 버튼 */}
         <div className="w-full mb-6">
            {isAdVisible && adClickCount < 10 ? (
             <button onClick={handleRewardAd} className="w-full py-3 bg-amber-400 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1 active:scale-95 shadow-md hover:bg-amber-500 transition-all">
@@ -397,6 +399,7 @@ const WordGuessGame = () => {
               {l.char.toUpperCase()}
             </button>
           ))}
+          {/* 다 썼을 때 빈 공간 유지용 메시지 */}
           {scrambledLetters.length === 0 && !isCorrect && (
             <div className="text-gray-300 text-xs font-bold italic py-4">All letters placed</div>
           )}
@@ -407,7 +410,7 @@ const WordGuessGame = () => {
            <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-gray-300 text-[10px] font-bold">ANSWER</span>
         </div>
 
-        {/* 5. 정답 적는 곳 */}
+        {/* 5. 정답 적는 곳 (빈칸 없음) */}
         <div className="w-full flex-grow flex flex-col justify-start items-center mb-6">
             {renderedAnswerArea}
             {(isCorrect || message) && (
