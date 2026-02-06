@@ -10,7 +10,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // --- 게임에서 사용할 기능들 ---
 
-// 1. 로그인 (이메일 매직 링크)
+// 1. 로그인
 export const loginWithGoogle = async () => {
   const email = window.prompt("Please enter your email to save progress:\n(A login link will be sent to your inbox)");
   if (!email) return;
@@ -36,26 +36,22 @@ export const logout = async () => {
   else alert("Logged out successfully.");
 };
 
-// 3. [수정됨] 데이터 저장 (안전한 수동 저장 방식)
-// Upsert 대신, 있는지 확인하고 -> 없으면 만들고 -> 있으면 수정합니다.
-// 이 방식은 DB에 Unique 설정이 없어도 에러가 나지 않습니다.
+// 3. [강력 수정] 데이터 저장 (중복 무시 버전)
 export const saveProgress = async (userId, level, score) => {
   try {
-    // 숫자가 문자로 들어가는 것을 방지하기 위해 Number()로 감싸줍니다.
     const safeLevel = Number(level);
     const safeScore = Number(score);
 
-    // 1. 내 데이터가 있는지 확인
-    const { data: existingData, error: selectError } = await supabase
+    // 1. 데이터 조회 (single()을 빼서 에러 방지)
+    const { data, error } = await supabase
       .from('game_progress')
       .select('id')
-      .eq('userid', userId)
-      .maybeSingle(); // 데이터가 없어도 에러를 내지 않음
+      .eq('userid', userId); // 중복이 있어도 에러 안 남
 
-    if (selectError) throw selectError;
+    if (error) throw error;
 
-    if (existingData) {
-      // 2. 있으면 -> 업데이트
+    if (data && data.length > 0) {
+      // 2. 데이터가 있으면 (1개든 10개든) 전부 업데이트
       const { error: updateError } = await supabase
         .from('game_progress')
         .update({ level: safeLevel, score: safeScore })
@@ -63,27 +59,28 @@ export const saveProgress = async (userId, level, score) => {
       
       if (updateError) throw updateError;
     } else {
-      // 3. 없으면 -> 새로 만들기
+      // 3. 없으면 새로 생성
       const { error: insertError } = await supabase
         .from('game_progress')
         .insert({ userid: userId, level: safeLevel, score: safeScore });
       
       if (insertError) throw insertError;
     }
-    console.log("Save Success:", safeLevel, safeScore);
+    console.log("DB 저장 성공 (강제):", safeLevel, safeScore);
   } catch (error) {
     console.error('Save Error:', error.message);
   }
 };
 
-// 4. 데이터 불러오기
+// 4. [강력 수정] 데이터 불러오기 (중복 무시 버전)
 export const loadProgress = async (userId) => {
   const { data, error } = await supabase
     .from('game_progress')
     .select('*')
-    .eq('userid', userId)
-    .single();
+    .eq('userid', userId); // single() 제거
 
   if (error) return null;
-  return data;
+
+  // 데이터가 여러 개면 첫 번째 것만 사용
+  return (data && data.length > 0) ? data[0] : null;
 };
