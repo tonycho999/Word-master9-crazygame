@@ -10,9 +10,9 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // --- 게임에서 사용할 기능들 ---
 
-// 1. 구글 로그인
+// 1. 구글 로그인 (수정됨: 에러 원인이었던 data 변수 삭제)
 export const loginWithGoogle = async () => {
-  const { data, error } = await supabase.auth.signInWithOAuth({
+  const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo: window.location.origin, // 로그인 후 원래 페이지로 돌아오기
