@@ -23,12 +23,10 @@ const WordGuessGame = () => {
   const [isCorrect, setIsCorrect] = useState(false);
   const [hintStage, setHintStage] = useState(() => Number(localStorage.getItem('word-game-hint-stage')) || 0);
   const [message, setMessage] = useState('');
-  const [hintMessage, setHintMessage] = useState('');
+  const [hintMessage, setHintMessage] = useState(''); 
   const [isFlashing, setIsFlashing] = useState(false);
   
-  // 부분 정답 체크용 (사운드 재생을 위해)
   const [completedWordCount, setCompletedWordCount] = useState(0);
-  
   const [conflictData, setConflictData] = useState(null); 
 
   const [isAdVisible, setIsAdVisible] = useState(true);
@@ -57,7 +55,7 @@ const WordGuessGame = () => {
         gain.gain.setValueAtTime(0.1, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
         osc.start(); osc.stop(ctx.currentTime + 0.3);
-      } else if (type === 'partialSuccess') { // 부분 정답 (띠링!)
+      } else if (type === 'partialSuccess') { 
         osc.frequency.setValueAtTime(600, ctx.currentTime);
         gain.gain.setValueAtTime(0.1, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
@@ -78,7 +76,6 @@ const WordGuessGame = () => {
     } catch (e) {}
   }, []);
 
-  // 데이터 충돌 체크
   const checkDataConflict = useCallback(async (userId) => {
       const dbData = await loadProgress(userId);
       if (dbData) {
@@ -317,9 +314,8 @@ const WordGuessGame = () => {
         currentCheckIndex += wordLen;
     });
 
-    // 부분 정답 늘어났을 때 소리 재생
     if (matchedCount > completedWordCount) {
-        if (matchedCount < words.length) { // 전체 정답이 아닐 때만
+        if (matchedCount < words.length) { 
             playSound('partialSuccess');
             setMessage('NICE!');
             setTimeout(() => setMessage(''), 1000);
@@ -336,9 +332,9 @@ const WordGuessGame = () => {
     } else { setIsCorrect(false); }
   }, [selectedLetters, currentWord, isCorrect, playSound, completedWordCount]);
 
-  // --- 렌더링 로직 (정답 표시 + 줄바꿈 금지) ---
+  // --- 렌더링 로직 ---
   const renderedAnswerArea = useMemo(() => {
-    // 1. Flash (정답 잠깐 보여주기)
+    // 1. Flash
     if (isFlashing) {
          return (
              <div className="flex flex-col gap-3 items-center w-full animate-pulse">
@@ -355,18 +351,15 @@ const WordGuessGame = () => {
          );
     }
 
-    // 2. [미스터리 모드] 정답 맞히기 전 + 힌트 3단계 미만
-    // -> 부분 정답(초록색)은 표시하되, 줄바꿈(구조 힌트)은 절대 없음!
+    // 2. [미스터리 모드] 힌트 3단계 미만 -> 한 줄로 쭉 나옴 (부분 정답은 색상 표시)
     if (!isCorrect && hintStage < 3) {
         const words = currentWord.split(' ');
         let letterIndex = 0;
         
-        // Flattened List를 만듭니다 (줄바꿈 없이 한 줄로 쭉 렌더링하기 위해)
         const renderedLetters = words.flatMap((word, wIdx) => {
            const wordLen = word.length;
            const wordLetters = selectedLetters.slice(letterIndex, letterIndex + wordLen);
            
-           // 현재 단어가 완성되었는지 확인
            const isThisWordComplete = wordLetters.map(l => l.char).join('').toLowerCase() === word.toLowerCase();
            
            letterIndex += wordLen;
@@ -388,7 +381,7 @@ const WordGuessGame = () => {
         );
     }
 
-    // 3. [공개 모드] 정답이거나 힌트 3단계 이상 (구조 보여줌)
+    // 3. [공개 모드] 정답 or 힌트 3단계 이상 -> 단어별 구조 공개
     const words = currentWord.split(' ');
     let letterIndex = 0;
 
@@ -427,9 +420,10 @@ const WordGuessGame = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none relative">
       
+      {/* [수정됨] 고정된 팝업 (animate-bounce 제거) */}
       {conflictData && (
           <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl animate-bounce">
+              <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
                   <h3 className="text-xl font-black text-indigo-600 mb-2">SYNC CONFLICT</h3>
                   <p className="text-sm text-gray-600 mb-6 font-bold">Different levels found. Which one to keep?</p>
                   
