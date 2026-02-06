@@ -23,8 +23,11 @@ const WordGuessGame = () => {
   const [isCorrect, setIsCorrect] = useState(false);
   const [hintStage, setHintStage] = useState(() => Number(localStorage.getItem('word-game-hint-stage')) || 0);
   const [message, setMessage] = useState('');
-  const [hintMessage, setHintMessage] = useState(''); // 상단에 띄울 힌트 텍스트
+  const [hintMessage, setHintMessage] = useState('');
   const [isFlashing, setIsFlashing] = useState(false);
+  
+  // 부분 정답 체크용 (사운드 재생을 위해)
+  const [completedWordCount, setCompletedWordCount] = useState(0);
   
   const [conflictData, setConflictData] = useState(null); 
 
@@ -54,6 +57,11 @@ const WordGuessGame = () => {
         gain.gain.setValueAtTime(0.1, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
         osc.start(); osc.stop(ctx.currentTime + 0.3);
+      } else if (type === 'partialSuccess') { // 부분 정답 (띠링!)
+        osc.frequency.setValueAtTime(600, ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+        osc.start(); osc.stop(ctx.currentTime + 0.2);
       } else if (type === 'allSuccess') {
         [523, 659, 783, 1046].forEach((f, i) => {
           const o = ctx.createOscillator(); const g = ctx.createGain();
@@ -70,7 +78,7 @@ const WordGuessGame = () => {
     } catch (e) {}
   }, []);
 
-  // [수정됨] 데이터 충돌 체크 함수 (useCallback으로 감싸서 에러 방지)
+  // 데이터 충돌 체크
   const checkDataConflict = useCallback(async (userId) => {
       const dbData = await loadProgress(userId);
       if (dbData) {
@@ -78,7 +86,6 @@ const WordGuessGame = () => {
           if (dbData.level !== localLevel) {
               setConflictData(dbData); 
           } else {
-              // 점수만 업데이트 (함수형 업데이트로 의존성 제거)
               setScore(prevScore => (dbData.score > prevScore ? dbData.score : prevScore));
           }
       }
@@ -95,7 +102,7 @@ const WordGuessGame = () => {
       if (session?.user) checkDataConflict(session.user.id);
     });
     return () => subscription.unsubscribe();
-  }, [checkDataConflict]); // 이제 checkDataConflict가 의존성에 포함되어도 안전함
+  }, [checkDataConflict]);
 
   const handleResolveConflict = async (choice) => {
     playSound('click');
@@ -200,6 +207,7 @@ const WordGuessGame = () => {
     setHintMessage('');
     setIsFlashing(false);
     setMessage('');
+    setCompletedWordCount(0);
   }, [level]);
 
   useEffect(() => { if (!currentWord) loadNewWord(); }, [currentWord, loadNewWord]);
@@ -210,6 +218,7 @@ const WordGuessGame = () => {
     return `${count} WORD${count > 1 ? 'S' : ''}`; 
   }, [currentWord]);
 
+  // --- 힌트 핸들러 ---
   const handleHint = () => {
     playSound('click');
     if (isCorrect) return;
@@ -288,17 +297,48 @@ const WordGuessGame = () => {
     }
   };
 
+  // --- 정답 및 부분 정답 체크 ---
   useEffect(() => {
     if (!currentWord) return;
+
+    // 1. 부분 정답(단어별 완성) 체크
+    const words = currentWord.split(' ');
+    let currentCheckIndex = 0;
+    let matchedCount = 0;
+
+    words.forEach(word => {
+        const wordLen = word.length;
+        const enteredChunk = selectedLetters.slice(currentCheckIndex, currentCheckIndex + wordLen);
+        const enteredStr = enteredChunk.map(l => l.char).join('').toLowerCase();
+        
+        if (enteredStr === word.toLowerCase()) {
+            matchedCount++;
+        }
+        currentCheckIndex += wordLen;
+    });
+
+    // 부분 정답 늘어났을 때 소리 재생
+    if (matchedCount > completedWordCount) {
+        if (matchedCount < words.length) { // 전체 정답이 아닐 때만
+            playSound('partialSuccess');
+            setMessage('NICE!');
+            setTimeout(() => setMessage(''), 1000);
+        }
+    }
+    setCompletedWordCount(matchedCount);
+
+    // 2. 전체 정답 체크
     const targetClean = currentWord.replace(/\s/g, '').toLowerCase();
     const selectedClean = selectedLetters.map(l => l.char).join('').toLowerCase();
     
     if (targetClean.length > 0 && targetClean === selectedClean) {
         if (!isCorrect) { setIsCorrect(true); playSound('allSuccess'); }
     } else { setIsCorrect(false); }
-  }, [selectedLetters, currentWord, isCorrect, playSound]);
+  }, [selectedLetters, currentWord, isCorrect, playSound, completedWordCount]);
 
+  // --- 렌더링 로직 (정답 표시 + 줄바꿈 금지) ---
   const renderedAnswerArea = useMemo(() => {
+    // 1. Flash (정답 잠깐 보여주기)
     if (isFlashing) {
          return (
              <div className="flex flex-col gap-3 items-center w-full animate-pulse">
@@ -315,14 +355,32 @@ const WordGuessGame = () => {
          );
     }
 
+    // 2. [미스터리 모드] 정답 맞히기 전 + 힌트 3단계 미만
+    // -> 부분 정답(초록색)은 표시하되, 줄바꿈(구조 힌트)은 절대 없음!
     if (!isCorrect && hintStage < 3) {
+        const words = currentWord.split(' ');
+        let letterIndex = 0;
+        
+        // Flattened List를 만듭니다 (줄바꿈 없이 한 줄로 쭉 렌더링하기 위해)
+        const renderedLetters = words.flatMap((word, wIdx) => {
+           const wordLen = word.length;
+           const wordLetters = selectedLetters.slice(letterIndex, letterIndex + wordLen);
+           
+           // 현재 단어가 완성되었는지 확인
+           const isThisWordComplete = wordLetters.map(l => l.char).join('').toLowerCase() === word.toLowerCase();
+           
+           letterIndex += wordLen;
+
+           return wordLetters.map(l => (
+               <div key={l.id} className={`w-10 h-12 sm:w-12 sm:h-14 border-b-4 rounded-t-lg flex items-center justify-center text-2xl font-black transition-all duration-200 -translate-y-1 ${isThisWordComplete ? 'border-green-400 bg-green-50 text-green-600' : 'border-indigo-600 bg-indigo-50 text-indigo-800'}`}>
+                 {l.char.toUpperCase()}
+               </div>
+           ));
+        });
+
         return (
             <div className="flex flex-wrap gap-1 md:gap-2 w-full justify-center items-center min-h-[60px]">
-                {selectedLetters.map((l) => (
-                    <div key={l.id} className="w-10 h-12 sm:w-12 sm:h-14 border-b-4 border-indigo-600 bg-indigo-50 text-indigo-800 rounded-t-lg flex items-center justify-center text-2xl font-black -translate-y-1">
-                      {l.char.toUpperCase()}
-                    </div>
-                ))}
+                {renderedLetters}
                 {selectedLetters.length === 0 && ( 
                     <span className="text-gray-300 text-xs font-bold tracking-widest animate-pulse uppercase">TAP LETTERS</span> 
                 )}
@@ -330,13 +388,12 @@ const WordGuessGame = () => {
         );
     }
 
+    // 3. [공개 모드] 정답이거나 힌트 3단계 이상 (구조 보여줌)
     const words = currentWord.split(' ');
     let letterIndex = 0;
 
-    const containerClass = "flex flex-col gap-3 w-full items-center";
-
     return (
-      <div className={containerClass}>
+      <div className="flex flex-col gap-3 w-full items-center">
         {words.map((word, wIdx) => {
            const wordLen = word.length;
            const wordLetters = selectedLetters.slice(letterIndex, letterIndex + wordLen);
