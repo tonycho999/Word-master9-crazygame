@@ -103,7 +103,9 @@ const WordGuessGame = () => {
                   <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-black text-indigo-600 flex items-center gap-2"><Mail size={24}/> LOGIN</h3><button onClick={() => auth.setShowLoginModal(false)}><X size={24}/></button></div>
                   <form onSubmit={sendMagicLink} className="flex flex-col gap-3">
                       <input type="email" value={inputEmail} onChange={(e) => setInputEmail(e.target.value)} placeholder="your@email.com" className="w-full px-4 py-3 rounded-xl border-2 border-indigo-100 bg-indigo-50" required />
-                      <button type="submit" disabled={isSendingEmail} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black">{isSendingEmail ? 'SENDING...' : 'SEND MAGIC LINK'}</button>
+                      <button type="submit" disabled={isSendingEmail} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black flex items-center justify-center gap-2">
+                        {isSendingEmail ? 'SENDING...' : 'SEND MAGIC LINK'} <Send size={16}/>
+                      </button>
                   </form>
               </div>
           </div>
