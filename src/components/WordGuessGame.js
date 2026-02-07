@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Trophy, Delete, ArrowRight, Lightbulb, RotateCcw, PlayCircle, RefreshCcw, LogIn, LogOut, Server, Smartphone } from 'lucide-react';
+import { Trophy, Delete, ArrowRight, Lightbulb, RotateCcw, PlayCircle, RefreshCcw, LogIn, LogOut, Server, Smartphone, Wifi, WifiOff } from 'lucide-react';
 import { supabase, loginWithGoogle, logout, saveProgress, loadProgress } from '../supabase';
 import { wordDatabase, twoWordDatabase, threeWordDatabase, fourWordDatabase, fiveWordDatabase, LEVEL_CONFIG } from '../data/wordDatabase';
 
 // [배포 버전]
-const CURRENT_VERSION = '1.2.8'; 
+const CURRENT_VERSION = '1.3.0'; 
 
 const WordGuessGame = () => {
   // --- 상태 관리 ---
   const [user, setUser] = useState(null); 
+  const [isOnline, setIsOnline] = useState(navigator.onLine); // 온라인 상태 확인
 
   const [level, setLevel] = useState(() => Number(localStorage.getItem('word-game-level')) || 1);
   const [score, setScore] = useState(() => Number(localStorage.getItem('word-game-score')) || 300);
@@ -47,6 +48,31 @@ const WordGuessGame = () => {
         localStorage.setItem('game-version', CURRENT_VERSION);
     }
   }, []);
+
+  // --- 온라인/오프라인 감지 리스너 ---
+  useEffect(() => {
+    const handleOnline = () => {
+        setIsOnline(true);
+        setMessage('ONLINE: SYNCING...');
+        setTimeout(() => setMessage(''), 2000);
+        // 인터넷 연결 시 즉시 데이터 동기화 체크
+        if (user) {
+            checkDataConflict(user.id);
+        }
+    };
+    const handleOffline = () => {
+        setIsOnline(false);
+        setMessage('OFFLINE MODE');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+    };
+  }, [user]); // user가 바뀔 때마다 체크 함수 갱신 필요
 
   // --- 사운드 ---
   const playSound = useCallback(async (type) => {
@@ -89,15 +115,34 @@ const WordGuessGame = () => {
     } catch (e) {}
   }, []);
 
+  // --- 데이터 충돌 체크 (DB vs Local) ---
   const checkDataConflict = useCallback(async (userId) => {
-      const dbData = await loadProgress(userId);
-      if (dbData) {
-          const localLevel = Number(localStorage.getItem('word-game-level') || 1);
-          if (dbData.level !== localLevel) {
-              setConflictData(dbData); 
-          } else {
-              setScore(prevScore => (dbData.score > prevScore ? dbData.score : prevScore));
+      // 오프라인이면 체크하지 않음
+      if (!navigator.onLine) return;
+
+      try {
+          const dbData = await loadProgress(userId);
+          if (dbData) {
+              const localLevel = Number(localStorage.getItem('word-game-level') || 1);
+              const localScore = Number(localStorage.getItem('word-game-score') || 300);
+
+              // 1. 레벨이 다르면 무조건 물어봄
+              if (dbData.level !== localLevel) {
+                  setConflictData({ ...dbData, type: 'level_mismatch' }); 
+              } 
+              // 2. 레벨은 같은데 점수 차이가 크면(예: 100점 이상) 물어보거나, 그냥 높은 점수 반영
+              else if (dbData.score > localScore) {
+                   // 서버 점수가 더 높으면 조용히 업데이트 (사용자 편의)
+                   setScore(dbData.score);
+                   localStorage.setItem('word-game-score', dbData.score);
+              }
+              // 3. 로컬 점수가 더 높으면 서버에 저장 (오프라인 플레이 후 복귀)
+              else if (localScore > dbData.score) {
+                  await saveProgress(userId, localLevel, localScore);
+              }
           }
+      } catch (error) {
+          console.error("Sync Check Failed:", error);
       }
   }, []);
 
@@ -119,6 +164,7 @@ const WordGuessGame = () => {
     if (!conflictData || !user) return;
 
     if (choice === 'server') {
+        // 서버 데이터 선택
         setLevel(conflictData.level);
         setScore(conflictData.score);
         localStorage.setItem('word-game-level', conflictData.level);
@@ -128,6 +174,7 @@ const WordGuessGame = () => {
         setConflictData(null);
         setMessage('LOADED SERVER DATA!');
     } else {
+        // 로컬 데이터 선택 -> 서버에 덮어쓰기
         await saveProgress(user.id, level, score);
         setConflictData(null);
         setMessage('SAVED LOCAL DATA!');
@@ -135,10 +182,25 @@ const WordGuessGame = () => {
     setTimeout(() => setMessage(''), 2000);
   };
 
-  const handleLogin = async () => { playSound('click'); await loginWithGoogle(); };
-  const handleLogout = async () => { playSound('click'); await logout(); setUser(null); setMessage('LOGGED OUT'); setTimeout(() => setMessage(''), 1500); };
+  const handleLogin = async () => { 
+      if (!isOnline) {
+          setMessage("OFFLINE: Can't Login");
+          setTimeout(() => setMessage(''), 1500);
+          return;
+      }
+      playSound('click'); 
+      await loginWithGoogle(); 
+  };
 
-  // --- 저장 ---
+  const handleLogout = async () => { 
+      playSound('click'); 
+      await logout(); 
+      setUser(null); 
+      setMessage('LOGGED OUT'); 
+      setTimeout(() => setMessage(''), 1500); 
+  };
+
+  // --- 저장 (Local + DB) ---
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
     localStorage.setItem('word-game-score', score);
@@ -151,11 +213,12 @@ const WordGuessGame = () => {
     localStorage.setItem('word-game-hint-stage', hintStage);
     localStorage.setItem('word-game-hint-message', hintMessage);
     
-    if (user && !conflictData) {
+    // 오프라인이 아니고, 유저가 있고, 충돌 상태가 아닐 때만 자동 저장
+    if (isOnline && user && !conflictData) {
         const timer = setTimeout(() => { saveProgress(user.id, level, score); }, 1000);
         return () => clearTimeout(timer);
     }
-  }, [level, score, currentWord, category, wordType, scrambledLetters, selectedLetters, solvedWordsData, hintStage, hintMessage, user, conflictData]);
+  }, [level, score, currentWord, category, wordType, scrambledLetters, selectedLetters, solvedWordsData, hintStage, hintMessage, user, conflictData, isOnline]);
 
   // --- 광고 쿨타임 ---
   useEffect(() => {
@@ -234,24 +297,28 @@ const WordGuessGame = () => {
     return `${count} WORD${count > 1 ? 'S' : ''}`; 
   }, [currentWord]);
 
-  // --- 힌트 로직 ---
-  const handleHint = () => {
+  // --- 힌트 로직 (DB 전송) ---
+  const handleHint = async () => {
     playSound('click');
     if (isCorrect) return;
 
     const words = currentWord.split(' ');
+    let newScore = score;
 
     if (hintStage === 0) {
         if (score >= 100) { 
-            setScore(s => s - 100); 
+            newScore = score - 100;
+            setScore(newScore); 
             setHintStage(1); 
             const hintText = words.map(w => w[0].toUpperCase() + '...').join('  /  ');
             setHintMessage(`HINT: ${hintText}`);
+            if (isOnline && user) await saveProgress(user.id, level, newScore);
         } else { setMessage("Need 100 Points!"); setTimeout(() => setMessage(''), 1500); }
     } 
     else if (hintStage === 1) {
         if (score >= 200) { 
-            setScore(s => s - 200); 
+            newScore = score - 200;
+            setScore(newScore); 
             setHintStage(2); 
             const hintText = words.map(w => 
                 w.length > 1 
@@ -259,22 +326,27 @@ const WordGuessGame = () => {
                 : w[0].toUpperCase()
             ).join('  /  ');
             setHintMessage(`HINT: ${hintText}`);
+            if (isOnline && user) await saveProgress(user.id, level, newScore);
         } else { setMessage("Need 200 Points!"); setTimeout(() => setMessage(''), 1500); }
     } 
     else if (hintStage === 2) {
         if (score >= 300) { 
-            setScore(s => s - 300); 
+            newScore = score - 300;
+            setScore(newScore); 
             setHintStage(3); 
             setMessage("WORD STRUCTURE REVEALED!");
             setTimeout(() => setMessage(''), 1500);
+            if (isOnline && user) await saveProgress(user.id, level, newScore);
         } else { setMessage("Need 300 Points!"); setTimeout(() => setMessage(''), 1500); }
     }
     else if (hintStage >= 3) {
         if (score >= 500) { 
-            setScore(s => s - 500); 
+            newScore = score - 500;
+            setScore(newScore); 
             setIsFlashing(true); 
             playSound('flash'); 
             setTimeout(() => { setIsFlashing(false); }, 500); 
+            if (isOnline && user) await saveProgress(user.id, level, newScore);
         } else { setMessage("Need 500 Points!"); setTimeout(() => setMessage(''), 1500); }
     }
   };
@@ -288,15 +360,35 @@ const WordGuessGame = () => {
 
   const handleShuffle = () => { playSound('click'); setScrambledLetters(prev => [...prev].sort(() => Math.random() - 0.5)); };
   
+  // --- 광고 보상 로직 (DB 전송) ---
   const handleRewardAd = () => {
+    if (!isOnline) {
+        setMessage("Need Internet for Ads");
+        setTimeout(() => setMessage(''), 1500);
+        return;
+    }
     if (adClickCount >= 10) return;
     playSound('click'); setIsAdLoading(true); setIsAdVisible(false);
-    setTimeout(() => {
+    
+    setTimeout(async () => {
       const newCount = adClickCount + 1;
-      setAdClickCount(newCount); setScore(s => s + 200); setIsAdLoading(false);
+      const newScore = score + 200; 
+      
+      setAdClickCount(newCount); 
+      setScore(newScore); 
+      setIsAdLoading(false);
+      
       localStorage.setItem('ad-click-count', newCount.toString());
       localStorage.setItem('ad-last-click-time', Date.now().toString());
-      playSound('reward'); setMessage('+200P Reward!'); setTimeout(() => setMessage(''), 2000);
+      
+      playSound('reward'); 
+      setMessage('+200P Reward!'); 
+      setTimeout(() => setMessage(''), 2000);
+      
+      if (isOnline && user) {
+          await saveProgress(user.id, level, newScore);
+      }
+
       if (newCount < 10) setTimeout(() => setIsAdVisible(true), 10 * 60 * 1000);
     }, 2500);
   };
@@ -311,6 +403,7 @@ const WordGuessGame = () => {
   
   const handleBackspace = () => { if(selectedLetters.length > 0) { playSound('click'); const last = selectedLetters[selectedLetters.length-1]; setSelectedLetters(prev => prev.slice(0, -1)); setScrambledLetters(prev => [...prev, last]); } };
 
+  // --- 레벨업 (DB 전송) ---
   const processNextLevel = async () => {
     playSound('click');
     const nextLevel = level + 1;
@@ -321,7 +414,7 @@ const WordGuessGame = () => {
     setCurrentWord(''); 
     setSolvedWordsData([]); 
 
-    if (user) {
+    if (isOnline && user) {
         await saveProgress(user.id, nextLevel, nextScore);
     }
   };
@@ -351,7 +444,6 @@ const WordGuessGame = () => {
 
   // --- 렌더링 ---
   const renderedAnswerArea = useMemo(() => {
-    // 1. Flash
     if (isFlashing) {
          return (
              <div className="flex flex-col gap-2 items-center w-full animate-pulse">
@@ -368,7 +460,6 @@ const WordGuessGame = () => {
          );
     }
 
-    // [NEW] 정답이 완성되었으면 -> 원래 문장 순서대로 강제 정렬!
     if (isCorrect) {
         return (
             <div className="flex flex-col gap-2 w-full items-center mb-2 animate-bounce">
@@ -385,7 +476,6 @@ const WordGuessGame = () => {
         );
     }
 
-    // 2. 이미 맞춘 단어 (중간 단계: 맞춘 순서대로 쌓임)
     const solvedArea = solvedWordsData.map((data, idx) => (
         <div key={`solved-${idx}`} className="flex gap-1 justify-center flex-wrap mb-2 animate-bounce">
             {data.letters.map(l => (
@@ -399,7 +489,6 @@ const WordGuessGame = () => {
     let inputArea;
 
     if (!isCorrect && hintStage < 3) {
-        // [미스터리 모드]
         inputArea = (
             <div className="flex flex-wrap gap-1 md:gap-2 w-full justify-center items-center min-h-[60px]">
                 {selectedLetters.map((l) => (
@@ -413,7 +502,6 @@ const WordGuessGame = () => {
             </div>
         );
     } else {
-         // [공개 모드]
          const allWords = currentWord.split(' ');
          const solvedWordsList = solvedWordsData.map(d => d.word.toUpperCase());
          const remainingWords = allWords.filter(w => !solvedWordsList.includes(w.toUpperCase()));
@@ -459,11 +547,12 @@ const WordGuessGame = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none relative">
       
+      {/* --- 충돌 해결 모달 --- */}
       {conflictData && (
           <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+              <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl animate-bounce">
                   <h3 className="text-xl font-black text-indigo-600 mb-2">SYNC CONFLICT</h3>
-                  <p className="text-sm text-gray-600 mb-6 font-bold">Different levels found. Which one to keep?</p>
+                  <p className="text-sm text-gray-600 mb-6 font-bold">You played offline. Which data to keep?</p>
                   
                   <div className="flex flex-col gap-3">
                       <button onClick={() => handleResolveConflict('server')} className="w-full py-4 bg-indigo-500 text-white rounded-xl font-black flex items-center justify-center gap-3 hover:bg-indigo-600">
@@ -476,7 +565,7 @@ const WordGuessGame = () => {
                       <button onClick={() => handleResolveConflict('local')} className="w-full py-4 bg-gray-200 text-gray-600 rounded-xl font-black flex items-center justify-center gap-3 hover:bg-gray-300">
                           <Smartphone size={20}/> 
                           <div className="flex flex-col items-start text-xs">
-                              <span>KEEP CURRENT</span>
+                              <span>KEEP LOCAL SAVE</span>
                               <span className="text-gray-500">LEVEL {level} (Score {score})</span>
                           </div>
                       </button>
@@ -491,14 +580,28 @@ const WordGuessGame = () => {
         <div className="w-full flex justify-between items-center mb-2 font-black text-indigo-600">
           <span className="text-lg">LEVEL {level}</span>
           <div className="flex items-center gap-3">
+             {/* 온라인/오프라인 상태 표시 아이콘 */}
+             {isOnline ? (
+                <Wifi size={16} className="text-green-500" />
+             ) : (
+                <WifiOff size={16} className="text-red-500 animate-pulse" />
+             )}
+             
              {user ? (
                 <button onClick={handleLogout} className="text-[10px] bg-red-100 text-red-500 px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-red-200"><LogOut size={12}/> OUT</button>
              ) : (
-                <button onClick={handleLogin} className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-blue-200 animate-pulse"><LogIn size={12}/> SAVE</button>
+                <button onClick={handleLogin} disabled={!isOnline} className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-blue-200 animate-pulse disabled:opacity-50"><LogIn size={12}/> SAVE</button>
              )}
              <span className="flex items-center gap-1"><Trophy size={18} className="text-yellow-500"/> {score}</span>
           </div>
         </div>
+
+        {/* 오프라인 경고 메시지 */}
+        {!isOnline && (
+            <div className="w-full bg-red-50 text-red-500 text-[10px] font-bold text-center py-1 mb-2 rounded">
+                OFFLINE MODE (Data saved locally)
+            </div>
+        )}
 
         {/* 카테고리 */}
         <div className="text-center mb-3 w-full">
@@ -524,7 +627,7 @@ const WordGuessGame = () => {
         <div className="w-full mb-4">
            {isAdVisible && adClickCount < 10 ? (
             <button onClick={handleRewardAd} className="w-full py-3 bg-amber-400 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1 active:scale-95 shadow-md hover:bg-amber-500 transition-all"><PlayCircle size={16}/> {isAdLoading ? 'LOADING...' : `WATCH AD (+200P) (${adClickCount}/10)`}</button>
-          ) : ( <div className="w-full py-2 text-center text-[10px] text-gray-400 font-bold italic bg-gray-50 rounded-lg">{adClickCount >= 10 ? "Daily limit reached (10/10)" : "Next reward in 10 mins"}</div> )}
+          ) : ( <div className="w-full py-2 text-center text-[10px] text-gray-400 font-bold italic bg-gray-50 rounded-lg">{!isOnline ? "Internet required for Ads" : (adClickCount >= 10 ? "Daily limit reached (10/10)" : "Next reward in 10 mins")}</div> )}
         </div>
 
         {/* 알파벳 버튼들 */}
@@ -536,7 +639,7 @@ const WordGuessGame = () => {
         {/* 구분선 */}
         <div className="w-full h-px bg-gray-100 mb-4 relative"> <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-gray-300 text-[10px] font-bold">ANSWER</span> </div>
         
-        {/* 정답 구역 (높이 줄임) */}
+        {/* 정답 구역 */}
         <div className="w-full flex-grow flex flex-col justify-start items-center mb-4 min-h-[100px]">
             {renderedAnswerArea}
             {(isCorrect || message) && ( <div className={`mt-2 font-black text-xs tracking-widest animate-bounce ${isCorrect ? 'text-green-500' : 'text-amber-500'}`}>{message || 'EXCELLENT!'}</div> )}
