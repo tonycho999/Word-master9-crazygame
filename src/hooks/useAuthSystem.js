@@ -1,4 +1,3 @@
-// src/hooks/useAuthSystem.js
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, logout, saveProgress, syncGameData } from '../supabase';
 
@@ -9,15 +8,7 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
   const [conflictData, setConflictData] = useState(null);
   const [message, setMessage] = useState('');
 
-  // 1. 온라인 상태 감지
-  useEffect(() => {
-    const handleOnline = () => { setIsOnline(true); setMessage('ONLINE: SYNCING...'); setTimeout(() => setMessage(''), 2000); if (user) checkDataConflict(user.id); };
-    const handleOffline = () => { setIsOnline(false); setMessage('OFFLINE MODE'); };
-    window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline);
-    return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
-  }, [user]);
-
-  // 2. 데이터 동기화 및 충돌 체크
+  // 1. [순서 변경] 함수 정의를 위로 올림 (useEffect보다 먼저 있어야 함)
   const checkDataConflict = useCallback(async (userId) => {
     if (!navigator.onLine) return;
     const currentLevel = Number(localStorage.getItem('word-game-level') || 1);
@@ -34,7 +25,26 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
       localStorage.setItem('word-game-score', result.serverData.score);
       console.log("⚡ 서버 데이터로 업데이트됨");
     }
-  }, [user, setLevel, setScore]);
+  }, [user, setLevel, setScore]); // 의존성 배열 유지
+
+  // 2. 온라인 상태 감지 (이제 checkDataConflict를 안전하게 사용 가능)
+  useEffect(() => {
+    const handleOnline = () => { 
+        setIsOnline(true); 
+        setMessage('ONLINE: SYNCING...'); 
+        setTimeout(() => setMessage(''), 2000); 
+        if (user) checkDataConflict(user.id); 
+    };
+    const handleOffline = () => { setIsOnline(false); setMessage('OFFLINE MODE'); };
+    
+    window.addEventListener('online', handleOnline); 
+    window.addEventListener('offline', handleOffline);
+    
+    return () => { 
+        window.removeEventListener('online', handleOnline); 
+        window.removeEventListener('offline', handleOffline); 
+    };
+  }, [user, checkDataConflict]); // ★ checkDataConflict 추가됨
 
   // 3. 로그인 상태 감지
   useEffect(() => {
@@ -43,6 +53,7 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
       if (session?.user) { setUser(session.user); checkDataConflict(session.user.id); }
     };
     initSession();
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user);
@@ -61,7 +72,7 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
       setLevel(conflictData.level); setScore(conflictData.score);
       localStorage.setItem('word-game-level', conflictData.level); localStorage.setItem('word-game-score', conflictData.score);
       setConflictData(null); setMessage('LOADED SERVER DATA!');
-      window.location.reload(); // 데이터 갱신을 위해 리로드 추천
+      window.location.reload(); 
     } else {
       await saveProgress(user.id, levelRef.current, scoreRef.current, user.email);
       setConflictData(null); setMessage('SAVED LOCAL DATA!');
