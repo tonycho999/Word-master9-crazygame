@@ -10,7 +10,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // --- 게임에서 사용할 기능들 ---
 
-// 1. 로그인
+// 1. 로그인 (비상용 - 메인 화면의 모달이 주로 사용됨)
 export const loginWithGoogle = async () => {
   const email = window.prompt("Enter email for Magic Link:");
   if (!email) return;
@@ -25,16 +25,16 @@ export const logout = async () => {
   if (error) console.error('Logout Error:', error);
 };
 
-// 3. [디버깅] 데이터 저장 함수 (에러를 확실히 보여줌)
+// 3. [디버깅 모드] 데이터 저장 함수
 export const saveProgress = async (userId, level, score, email) => {
-  console.log("🚀 [저장 시도] 데이터:", { userId, level, score, email }); // 1. 시도 로그
+  console.log("🚀 [저장 시도] 데이터:", { userId, level, score, email });
 
   try {
     const updates = {
       userid: userId,    
       level: Number(level),
       score: Number(score),
-      updated_at: new Date(),
+      // updated_at: new Date(), // ★ 에러 방지를 위해 잠시 껐습니다. (DB에 컬럼 추가 후 주석 해제하세요)
     };
 
     if (email) {
@@ -45,16 +45,17 @@ export const saveProgress = async (userId, level, score, email) => {
     const { data, error } = await supabase
       .from('game_progress') 
       .upsert(updates, { onConflict: 'userid' })
-      .select(); // 저장이 잘 됐는지 결과를 반환받음
+      .select(); 
 
-    // 에러 발생 시
+    // 에러 발생 시 알림
     if (error) {
-      console.error("❌ [저장 실패] DB 에러:", error); // 2. 에러 로그 (중요!)
-      alert("데이터 저장 실패: " + error.message + "\n(개발자 도구 콘솔을 확인하세요)");
+      console.error("❌ [저장 실패] DB 에러:", error); 
+      // 에러 메시지를 띄워서 원인을 파악합니다.
+      alert("데이터 저장 실패!\n원인: " + error.message);
       throw error;
     }
     
-    console.log("✅ [저장 성공] 완료된 데이터:", data); // 3. 성공 로그
+    console.log("✅ [저장 성공] DB 응답:", data);
 
   } catch (error) {
     console.error("❌ [시스템 에러]:", error.message);
