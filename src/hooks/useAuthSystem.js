@@ -8,9 +8,11 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
   const [conflictData, setConflictData] = useState(null);
   const [message, setMessage] = useState('');
 
-  // 1. 데이터 동기화 함수 (useEffect보다 위에 있어야 함)
+  // 1. 데이터 동기화 함수
   const checkDataConflict = useCallback(async (userId) => {
     if (!navigator.onLine) return;
+    
+    // [중요] 비교 전 확실하게 숫자로 변환
     const currentLevel = Number(localStorage.getItem('word-game-level') || 1);
     const currentScore = Number(localStorage.getItem('word-game-score') || 300);
     
@@ -46,7 +48,7 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
     };
   }, [user, checkDataConflict]);
 
-  // 3. 로그인 상태 감지 (Auth Listener)
+  // 3. 로그인 상태 감지
   useEffect(() => {
     const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -66,36 +68,36 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
   }, [checkDataConflict]);
 
   // 4. 액션 핸들러들
-
-  // ★ [수정됨] 충돌 해결 시 새로고침 없이 상태만 업데이트 (오프라인 화면 깨짐 방지)
   const handleResolveConflict = async (choice) => {
     playSound('click'); 
     if (!conflictData || !user) return;
     
     if (choice === 'server') {
-      // 서버 데이터를 선택했을 때:
-      // 1. 즉시 화면(State) 업데이트
-      setLevel(conflictData.level); 
-      setScore(conflictData.score);
+      // [서버 데이터 선택 시]
+      // 1. 로컬 스토리지에 확실하게 저장 (숫자로 변환)
+      const newLevel = Number(conflictData.level);
+      const newScore = Number(conflictData.score);
       
-      // 2. 로컬 저장소 업데이트
-      localStorage.setItem('word-game-level', conflictData.level); 
-      localStorage.setItem('word-game-score', conflictData.score);
+      localStorage.setItem('word-game-level', newLevel); 
+      localStorage.setItem('word-game-score', newScore);
       
-      // 3. 모달 닫기 및 알림
-      setConflictData(null); 
       setMessage('LOADED SERVER DATA!');
       
-      // (중요) window.location.reload() 제거됨! -> 이제 화면 안 깨집니다.
+      // [핵심 수정] 서버 데이터를 가져올 때는 "새로고침"을 해야 루프가 확실히 끊기고
+      // 게임 단어(Word)도 해당 레벨에 맞게 다시 로딩됩니다.
+      // (이때는 인터넷이 연결된 상태이므로 화면 깨짐 현상이 없습니다!)
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
 
     } else {
-      // 내 데이터를 선택했을 때: 서버에 덮어쓰기
+      // [내 기기 데이터 선택 시]
+      // 서버에 내 데이터를 덮어씌움 (새로고침 필요 없음)
       await saveProgress(user.id, levelRef.current, scoreRef.current, user.email);
       setConflictData(null); 
       setMessage('SAVED LOCAL DATA!');
+      setTimeout(() => setMessage(''), 2000);
     }
-    
-    setTimeout(() => setMessage(''), 2000);
   };
 
   const handleLogout = async () => {
@@ -104,7 +106,6 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
         await logout(); 
         setUser(null); 
         setMessage('LOGGED OUT'); 
-        // 로그아웃은 확실한 초기화를 위해 새로고침 유지 (인터넷 연결 시 권장)
         setTimeout(() => { setMessage(''); window.location.reload(); }, 1000); 
     } catch (e) { 
         window.location.reload(); 
