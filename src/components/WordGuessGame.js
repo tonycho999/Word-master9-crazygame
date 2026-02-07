@@ -3,8 +3,8 @@ import { Trophy, Delete, ArrowRight, Lightbulb, RotateCcw, PlayCircle, RefreshCc
 import { supabase, loginWithGoogle, logout, saveProgress, loadProgress } from '../supabase';
 import { wordDatabase, twoWordDatabase, threeWordDatabase, fourWordDatabase, fiveWordDatabase, LEVEL_CONFIG } from '../data/wordDatabase';
 
-// [NEW] 배포 버전 관리 (새 배포 시 유저 브라우저 강제 갱신용)
-const CURRENT_VERSION = '1.2.0'; 
+// [배포 버전]
+const CURRENT_VERSION = '1.2.1'; 
 
 const WordGuessGame = () => {
   // --- 상태 관리 ---
@@ -16,18 +16,12 @@ const WordGuessGame = () => {
   const [category, setCategory] = useState(() => localStorage.getItem('word-game-category') || '');
   const [wordType, setWordType] = useState(() => localStorage.getItem('word-game-word-type') || 'Normal');
   
-  // 전체 글자 풀 (섞여있는 것)
   const [scrambledLetters, setScrambledLetters] = useState(() => {
     try { return JSON.parse(localStorage.getItem('word-game-scrambled')) || []; } catch { return []; }
   });
-
-  // 현재 입력 중인 글자들 (아직 정답 처리 안 된 것)
   const [selectedLetters, setSelectedLetters] = useState(() => {
     try { return JSON.parse(localStorage.getItem('word-game-selected')) || []; } catch { return []; }
   });
-
-  // [NEW] 이미 맞춘 단어들 저장소 (순서 상관없이 맞추면 여기로 이동)
-  // 구조: [{ word: "GOLF", letters: [{char:'G', id:...}, ...] }, ...]
   const [solvedWordsData, setSolvedWordsData] = useState(() => {
     try { return JSON.parse(localStorage.getItem('word-game-solved-data')) || []; } catch { return []; }
   });
@@ -35,8 +29,10 @@ const WordGuessGame = () => {
   const [isCorrect, setIsCorrect] = useState(false);
   const [hintStage, setHintStage] = useState(() => Number(localStorage.getItem('word-game-hint-stage')) || 0);
   const [message, setMessage] = useState('');
-  const [hintMessage, setHintMessage] = useState(''); 
   const [isFlashing, setIsFlashing] = useState(false);
+  
+  // [수정됨] 힌트 메시지도 저장된 값으로 초기화 (새로고침 유지용)
+  const [hintMessage, setHintMessage] = useState(() => localStorage.getItem('word-game-hint-message') || ''); 
   
   const [conflictData, setConflictData] = useState(null); 
   const [isAdVisible, setIsAdVisible] = useState(true);
@@ -45,14 +41,11 @@ const WordGuessGame = () => {
 
   const audioCtxRef = useRef(null);
 
-  // [NEW] 버전 체크 (배포 시 자동 갱신)
+  // 버전 체크
   useEffect(() => {
     const savedVersion = localStorage.getItem('game-version');
     if (savedVersion !== CURRENT_VERSION) {
-        // 버전이 다르면 캐시 클리어 후 리로드
         localStorage.setItem('game-version', CURRENT_VERSION);
-        // 중요 데이터는 유지하고, 상태 관련만 리셋할 수도 있지만, 안전하게 그냥 진행
-        console.log("New version detected. Cleaning up...");
     }
   }, []);
 
@@ -85,7 +78,7 @@ const WordGuessGame = () => {
         [523, 659, 783, 1046].forEach((f, i) => {
           const o = ctx.createOscillator(); const g = ctx.createGain();
           o.connect(g); g.connect(ctx.destination); o.frequency.value = f;
-          g.gain.setValueAtTime(0.1, ctx.currentTime + i*0.08); o.start(ctx.currentTime + i*0.08); o.stop(ctx.currentTime + 0.4);
+          g.gain.setValueAtTime(0.1, ctx.currentTime + i*0.08); o.start(ctx.currentTime + i*0.08); o.stop(ctx.currentTime + i*0.1); // 짧게 수정
         });
       } else if (type === 'reward') {
         [440, 554, 659, 880, 1108].forEach((f, i) => {
@@ -132,7 +125,7 @@ const WordGuessGame = () => {
         localStorage.setItem('word-game-level', conflictData.level);
         localStorage.setItem('word-game-score', conflictData.score);
         setCurrentWord(''); 
-        setSolvedWordsData([]); // 레벨 바뀌면 초기화
+        setSolvedWordsData([]); 
         setConflictData(null);
         setMessage('LOADED SERVER DATA!');
     } else {
@@ -146,7 +139,7 @@ const WordGuessGame = () => {
   const handleLogin = async () => { playSound('click'); await loginWithGoogle(); };
   const handleLogout = async () => { playSound('click'); await logout(); setUser(null); setMessage('LOGGED OUT'); setTimeout(() => setMessage(''), 1500); };
 
-  // --- 저장 ---
+  // --- 저장 (hintMessage 추가됨) ---
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
     localStorage.setItem('word-game-score', score);
@@ -157,12 +150,14 @@ const WordGuessGame = () => {
     localStorage.setItem('word-game-selected', JSON.stringify(selectedLetters));
     localStorage.setItem('word-game-solved-data', JSON.stringify(solvedWordsData));
     localStorage.setItem('word-game-hint-stage', hintStage);
+    // [수정됨] 힌트 메시지 저장
+    localStorage.setItem('word-game-hint-message', hintMessage);
     
     if (user && !conflictData) {
         const timer = setTimeout(() => { saveProgress(user.id, level, score); }, 1000);
         return () => clearTimeout(timer);
     }
-  }, [level, score, currentWord, category, wordType, scrambledLetters, selectedLetters, solvedWordsData, hintStage, user, conflictData]);
+  }, [level, score, currentWord, category, wordType, scrambledLetters, selectedLetters, solvedWordsData, hintStage, hintMessage, user, conflictData]);
 
   // --- 광고 쿨타임 ---
   useEffect(() => {
@@ -222,10 +217,14 @@ const WordGuessGame = () => {
 
     setScrambledLetters(chars);
     setSelectedLetters([]);
-    setSolvedWordsData([]); // [중요] 새 단어 로드 시 맞춘 단어 초기화
+    setSolvedWordsData([]); 
     setIsCorrect(false);
+    
+    // [중요] 새 레벨에서는 힌트 초기화
     setHintStage(0);
     setHintMessage('');
+    localStorage.removeItem('word-game-hint-message');
+    
     setIsFlashing(false);
     setMessage('');
   }, [level]);
@@ -238,19 +237,17 @@ const WordGuessGame = () => {
     return `${count} WORD${count > 1 ? 'S' : ''}`; 
   }, [currentWord]);
 
-  // --- [NEW] 힌트 로직 (모든 단어 대상) ---
+  // --- 힌트 로직 ---
   const handleHint = () => {
     playSound('click');
     if (isCorrect) return;
 
-    // 전체 단어 목록 (예: ["GOLF", "CLUB"])
     const words = currentWord.split(' ');
 
     if (hintStage === 0) {
         if (score >= 100) { 
             setScore(s => s - 100); 
             setHintStage(1); 
-            // 모든 단어의 첫 글자 가져오기
             const firstLetters = words.map(w => w[0].toUpperCase()).join(' / ');
             setHintMessage(`FIRST LETTERS: ${firstLetters}`);
         } else { setMessage("Need 100 Points!"); setTimeout(() => setMessage(''), 1500); }
@@ -259,7 +256,6 @@ const WordGuessGame = () => {
         if (score >= 200) { 
             setScore(s => s - 200); 
             setHintStage(2); 
-            // 모든 단어의 마지막 글자 추가
             const lastLetters = words.map(w => w[w.length-1].toUpperCase()).join(' / ');
             setHintMessage(`LAST LETTERS: ${lastLetters}`);
         } else { setMessage("Need 200 Points!"); setTimeout(() => setMessage(''), 1500); }
@@ -306,11 +302,10 @@ const WordGuessGame = () => {
   
   const handleLetterClick = (letter) => { playSound('click'); setSelectedLetters(prev => [...prev, letter]); setScrambledLetters(prev => prev.filter(l => l.id !== letter.id)); };
   
-  // [NEW] 리셋 버튼: 맞춘 단어는 건드리지 않고, 입력 중인 글자만 리셋
   const handleReset = () => { 
       playSound('click'); 
-      setScrambledLetters(prev => [...prev, ...selectedLetters]); // 입력 중이던 건 돌려보냄
-      setSelectedLetters([]); // 입력창 비움
+      setScrambledLetters(prev => [...prev, ...selectedLetters]); 
+      setSelectedLetters([]); 
   };
   
   const handleBackspace = () => { if(selectedLetters.length > 0) { playSound('click'); const last = selectedLetters[selectedLetters.length-1]; setSelectedLetters(prev => prev.slice(0, -1)); setScrambledLetters(prev => [...prev, last]); } };
@@ -323,42 +318,29 @@ const WordGuessGame = () => {
     setScore(nextScore);
     setLevel(nextLevel);
     setCurrentWord(''); 
-    setSolvedWordsData([]); // 맞춘 단어 목록 초기화
+    setSolvedWordsData([]); 
 
     if (user) {
         await saveProgress(user.id, nextLevel, nextScore);
     }
   };
 
-  // --- [NEW] 정답 체크 로직 (순서 상관없이 & 즉시 줄바꿈) ---
+  // --- 정답 체크 ---
   useEffect(() => {
     if (!currentWord) return;
 
-    // 현재 입력된 문자열 (공백 없이)
     const enteredStr = selectedLetters.map(l => l.char).join('').toUpperCase();
-    
-    // 타겟 단어들 중 "아직 못 맞춘 단어" 확인
     const targetWords = currentWord.toUpperCase().split(' ');
-    
-    // 이미 맞춘 단어 리스트(문자열 배열)
     const alreadySolvedWords = solvedWordsData.map(data => data.word.toUpperCase());
-
-    // 입력된 글자가 타겟 단어 중 하나와 정확히 일치하고, 아직 안 맞춘 단어라면?
     const matchIndex = targetWords.findIndex(word => word === enteredStr && !alreadySolvedWords.includes(word));
 
     if (matchIndex !== -1) {
-        // 단어 찾음!
         const matchedWord = targetWords[matchIndex];
-        
-        // 1. 맞춘 단어로 등록
         const newSolvedData = [...solvedWordsData, { word: matchedWord, letters: [...selectedLetters] }];
         setSolvedWordsData(newSolvedData);
-
-        // 2. 입력창 비우기 (글자들은 scrambled로 돌아가지 않고 solvedData에 저장됨)
         setSelectedLetters([]);
         playSound('partialSuccess');
 
-        // 3. 전체 정답인지 확인 (맞춘 단어 개수 == 전체 단어 개수)
         if (newSolvedData.length === targetWords.length) {
             setIsCorrect(true);
             playSound('allSuccess');
@@ -366,10 +348,8 @@ const WordGuessGame = () => {
     }
   }, [selectedLetters, currentWord, solvedWordsData, playSound]);
 
-
-  // --- 렌더링 로직 ---
+  // --- 렌더링 ---
   const renderedAnswerArea = useMemo(() => {
-    // 1. Flash
     if (isFlashing) {
          return (
              <div className="flex flex-col gap-3 items-center w-full animate-pulse">
@@ -386,7 +366,6 @@ const WordGuessGame = () => {
          );
     }
 
-    // 2. [맞춘 단어들] - 항상 위쪽에 녹색으로 고정 표시 (줄바꿈 되어 보임)
     const solvedArea = solvedWordsData.map((data, idx) => (
         <div key={`solved-${idx}`} className="flex gap-1 justify-center flex-wrap mb-2 animate-bounce">
             {data.letters.map(l => (
@@ -397,11 +376,9 @@ const WordGuessGame = () => {
         </div>
     ));
 
-    // 3. [입력 중인 단어] - 힌트 단계에 따라 다르게 보임
     let inputArea;
 
     if (!isCorrect && hintStage < 3) {
-        // 미스터리 모드: 한 줄로 쭉
         inputArea = (
             <div className="flex flex-wrap gap-1 md:gap-2 w-full justify-center items-center min-h-[60px]">
                 {selectedLetters.map((l) => (
@@ -415,10 +392,6 @@ const WordGuessGame = () => {
             </div>
         );
     } else {
-        // 공개 모드 (힌트3 이상 or 정답 시) - 빈칸 구조 보여줌
-        // 단, 이미 맞춘 단어는 위(solvedArea)로 올라갔으므로, 여기서는 "아직 못 맞춘 단어의 빈칸"만 보여주면 됨
-        // 하지만 UX상 헷갈릴 수 있으므로, 입력 중인 글자만 보여주되 구조를 잡음
-        // 여기서는 간단하게 기존처럼 한 줄로 보여줍니다. (이미 맞춘건 위에 떴으니까)
          inputArea = (
             <div className="flex flex-wrap gap-1 md:gap-2 w-full justify-center items-center min-h-[60px]">
                 {selectedLetters.map((l) => (
@@ -432,21 +405,15 @@ const WordGuessGame = () => {
 
     return (
         <div className="flex flex-col w-full items-center">
-            {/* 이미 맞춘 단어 영역 */}
-            <div className="flex flex-col gap-2 w-full items-center mb-4">
-                {solvedArea}
-            </div>
-            {/* 현재 입력 영역 */}
+            <div className="flex flex-col gap-2 w-full items-center mb-4">{solvedArea}</div>
             {inputArea}
         </div>
     );
-
   }, [currentWord, selectedLetters, solvedWordsData, isCorrect, isFlashing, hintStage]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none relative">
       
-      {/* 팝업 */}
       {conflictData && (
           <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
