@@ -4,7 +4,7 @@ import { supabase, loginWithGoogle, logout, saveProgress, loadProgress } from '.
 import { wordDatabase, twoWordDatabase, threeWordDatabase, fourWordDatabase, fiveWordDatabase, LEVEL_CONFIG } from '../data/wordDatabase';
 
 // [배포 버전]
-const CURRENT_VERSION = '1.2.6'; 
+const CURRENT_VERSION = '1.2.7'; 
 
 const WordGuessGame = () => {
   // --- 상태 관리 ---
@@ -234,7 +234,7 @@ const WordGuessGame = () => {
     return `${count} WORD${count > 1 ? 'S' : ''}`; 
   }, [currentWord]);
 
-  // --- 힌트 로직 (점진적 공개) ---
+  // --- 힌트 로직 ---
   const handleHint = () => {
     playSound('click');
     if (isCorrect) return;
@@ -326,35 +326,22 @@ const WordGuessGame = () => {
     }
   };
 
-  // --- [중요] 정답 체크 (자유 입력 -> 자동 배치) ---
+  // --- 정답 체크 ---
   useEffect(() => {
     if (!currentWord) return;
 
-    // 현재 입력된 문자열 (공백 제거)
     const enteredStr = selectedLetters.map(l => l.char).join('').toUpperCase();
-    
-    // 전체 단어들
     const targetWords = currentWord.toUpperCase().split(' ');
-    
-    // 이미 맞춘 단어들
     const alreadySolvedWords = solvedWordsData.map(data => data.word.toUpperCase());
-
-    // "아직 못 맞춘 단어" 중 "현재 입력값"과 똑같은 단어가 있는지 확인
     const matchIndex = targetWords.findIndex(word => word === enteredStr && !alreadySolvedWords.includes(word));
 
     if (matchIndex !== -1) {
-        // 정답 단어 발견!
         const matchedWord = targetWords[matchIndex];
-        
-        // 1. 맞춘 단어로 등록 (자동으로 위쪽 칸으로 이동됨)
         const newSolvedData = [...solvedWordsData, { word: matchedWord, letters: [...selectedLetters] }];
         setSolvedWordsData(newSolvedData);
-
-        // 2. 입력창은 비우기
         setSelectedLetters([]);
         playSound('partialSuccess');
 
-        // 3. 모든 단어를 다 맞췄는지 확인
         if (newSolvedData.length === targetWords.length) {
             setIsCorrect(true);
             playSound('allSuccess');
@@ -362,9 +349,8 @@ const WordGuessGame = () => {
     }
   }, [selectedLetters, currentWord, solvedWordsData, playSound]);
 
-  // --- 렌더링 (디자인 수정: 폰트 축소, 테두리 변경) ---
+  // --- 렌더링 ---
   const renderedAnswerArea = useMemo(() => {
-    // 1. Flash
     if (isFlashing) {
          return (
              <div className="flex flex-col gap-2 items-center w-full animate-pulse">
@@ -381,7 +367,6 @@ const WordGuessGame = () => {
          );
     }
 
-    // 2. 이미 맞춘 단어 (무조건 줄바꿈되어 표시됨 - 고정석)
     const solvedArea = solvedWordsData.map((data, idx) => (
         <div key={`solved-${idx}`} className="flex gap-1 justify-center flex-wrap mb-2 animate-bounce">
             {data.letters.map(l => (
@@ -394,10 +379,9 @@ const WordGuessGame = () => {
 
     let inputArea;
 
-    // 3-A. [미스터리 모드] 힌트 3단계 미만 -> 자유로운 입력 (한 줄로 쭉)
     if (!isCorrect && hintStage < 3) {
         inputArea = (
-            <div className="flex flex-wrap gap-1 md:gap-2 w-full justify-center items-center min-h-[60px]">
+            <div className="flex flex-wrap gap-1 md:gap-2 w-full justify-center items-center min-h-[50px]">
                 {selectedLetters.map((l) => (
                     <div key={l.id} className="w-10 h-12 sm:w-12 sm:h-14 border-2 border-indigo-600 bg-indigo-50 text-indigo-800 rounded-lg flex items-center justify-center text-base font-bold -translate-y-1">
                       {l.char.toUpperCase()}
@@ -408,21 +392,17 @@ const WordGuessGame = () => {
                 )}
             </div>
         );
-    } 
-    // 3-B. [구조 공개 모드] 힌트 3단계 이상 -> 빈칸(회색 박스)과 함께 구조 표시
-    else {
+    } else {
          const allWords = currentWord.split(' ');
          const solvedWordsList = solvedWordsData.map(d => d.word.toUpperCase());
          const remainingWords = allWords.filter(w => !solvedWordsList.includes(w.toUpperCase()));
          
          let letterIndex = 0;
 
-         // 남은 단어들을 "각자 한 줄씩" 렌더링 (구조 힌트)
          inputArea = (
             <div className="flex flex-col gap-2 w-full items-center">
                 {remainingWords.map((word, idx) => {
                     const wordLen = word.length;
-                    // 현재 입력된 글자를 순서대로 할당 (단순 표시용)
                     const currentLetters = selectedLetters.slice(letterIndex, letterIndex + wordLen);
                     letterIndex += wordLen;
                     
@@ -431,13 +411,11 @@ const WordGuessGame = () => {
 
                     return (
                         <div key={`rem-${idx}`} className="flex gap-1 justify-center flex-wrap min-h-[50px]">
-                            {/* 입력된 글자 */}
                             {currentLetters.map(l => (
                                 <div key={l.id} className="w-10 h-12 sm:w-12 sm:h-14 border-2 border-indigo-600 bg-indigo-50 text-indigo-800 rounded-lg flex items-center justify-center text-base font-bold -translate-y-1">
                                     {l.char.toUpperCase()}
                                 </div>
                             ))}
-                            {/* 빈칸 */}
                             {emptySlots.map((_, i) => (
                                 <div key={`empty-${i}`} className="w-10 h-12 sm:w-12 sm:h-14 border-2 border-gray-200 bg-gray-100 rounded-lg flex items-center justify-center">
                                 </div>
@@ -451,9 +429,7 @@ const WordGuessGame = () => {
 
     return (
         <div className="flex flex-col w-full items-center">
-            {/* 이미 맞춘 단어는 위쪽에 쌓임 */}
-            <div className="flex flex-col gap-2 w-full items-center mb-4">{solvedArea}</div>
-            {/* 입력 공간 */}
+            <div className="flex flex-col gap-2 w-full items-center mb-2">{solvedArea}</div>
             {inputArea}
         </div>
     );
@@ -488,7 +464,10 @@ const WordGuessGame = () => {
           </div>
       )}
 
-      <div className="bg-white rounded-[2rem] p-6 w-full max-w-md shadow-2xl flex flex-col items-center border-t-8 border-indigo-500 min-h-[600px]">
+      {/* 모바일 화면 맞춤을 위해 높이 제한 제거, 패딩/마진 축소 */}
+      <div className="bg-white rounded-[2rem] p-4 w-full max-w-md shadow-2xl flex flex-col items-center border-t-8 border-indigo-500">
+        
+        {/* 상단바 */}
         <div className="w-full flex justify-between items-center mb-2 font-black text-indigo-600">
           <span className="text-lg">LEVEL {level}</span>
           <div className="flex items-center gap-3">
@@ -500,49 +479,61 @@ const WordGuessGame = () => {
              <span className="flex items-center gap-1"><Trophy size={18} className="text-yellow-500"/> {score}</span>
           </div>
         </div>
-        <div className="text-center mb-5 w-full">
-           <div className="flex justify-center gap-2 mb-2">
+
+        {/* 카테고리 */}
+        <div className="text-center mb-3 w-full">
+           <div className="flex justify-center gap-2 mb-1">
              <span className="py-1 px-3 bg-gray-100 text-gray-500 text-[10px] font-black rounded-full uppercase tracking-widest">{wordCountDisplay}</span>
              <span className={`py-1 px-3 text-[10px] font-black rounded-full uppercase tracking-widest ${wordType === 'PHRASE' ? 'bg-rose-100 text-rose-500' : 'bg-indigo-100 text-indigo-500'}`}>{wordType}</span>
            </div>
-           <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight">{category}</h2>
+           <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">{category}</h2>
            {hintMessage && (
-               <div className="mt-2 py-1 px-3 bg-indigo-50 text-indigo-600 font-bold text-sm rounded-lg animate-pulse inline-block border border-indigo-100">
+               <div className="mt-1 py-1 px-3 bg-indigo-50 text-indigo-600 font-bold text-xs rounded-lg animate-pulse inline-block border border-indigo-100">
                    {hintMessage}
                </div>
            )}
         </div>
-        <div className="flex gap-3 w-full mb-3">
+
+        {/* 기능 버튼 */}
+        <div className="flex gap-2 w-full mb-3">
             <button onClick={handleHint} disabled={isCorrect} className="flex-1 py-3 bg-gray-100 rounded-xl text-xs font-black flex items-center justify-center gap-1 uppercase hover:bg-gray-200 active:scale-95 transition-all"><Lightbulb size={14}/> {getHintButtonText()}</button>
             <button onClick={handleShuffle} disabled={isCorrect} className="flex-1 py-3 bg-gray-100 rounded-xl text-xs font-black flex items-center justify-center gap-1 uppercase hover:bg-gray-200 active:scale-95 disabled:opacity-50 transition-all"><RotateCcw size={14}/> SHUFFLE</button>
         </div>
-        <div className="w-full mb-6">
+
+        {/* 광고 버튼 */}
+        <div className="w-full mb-4">
            {isAdVisible && adClickCount < 10 ? (
             <button onClick={handleRewardAd} className="w-full py-3 bg-amber-400 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1 active:scale-95 shadow-md hover:bg-amber-500 transition-all"><PlayCircle size={16}/> {isAdLoading ? 'LOADING...' : `WATCH AD (+200P) (${adClickCount}/10)`}</button>
           ) : ( <div className="w-full py-2 text-center text-[10px] text-gray-400 font-bold italic bg-gray-50 rounded-lg">{adClickCount >= 10 ? "Daily limit reached (10/10)" : "Next reward in 10 mins"}</div> )}
         </div>
-        <div className="flex flex-wrap gap-2 justify-center mb-8 min-h-[100px] content-start">
+
+        {/* 알파벳 버튼들 */}
+        <div className="flex flex-wrap gap-2 justify-center mb-4 min-h-[80px] content-start">
           {scrambledLetters.map(l => ( <button key={l.id} onClick={() => handleLetterClick(l)} className="w-11 h-11 bg-white shadow-[0_4px_0_0_rgba(0,0,0,0.1)] border-2 border-gray-100 rounded-lg font-black text-xl text-indigo-600 active:translate-y-1 active:shadow-none transition-all hover:border-indigo-300">{l.char.toUpperCase()}</button> ))}
           {scrambledLetters.length === 0 && !isCorrect && ( <div className="text-gray-300 text-xs font-bold italic py-4">All letters placed</div> )}
         </div>
-        <div className="w-full h-px bg-gray-100 mb-8 relative"> <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-gray-300 text-[10px] font-bold">ANSWER</span> </div>
+
+        {/* 구분선 */}
+        <div className="w-full h-px bg-gray-100 mb-4 relative"> <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-gray-300 text-[10px] font-bold">ANSWER</span> </div>
         
-        {/* [크기 고정] 정답 영역이 커졌다 작아졌다 하지 않도록 min-h 고정 */}
-        <div className="w-full flex-grow flex flex-col justify-start items-center mb-6 min-h-[200px]">
+        {/* 정답 구역 (높이 줄임) */}
+        <div className="w-full flex-grow flex flex-col justify-start items-center mb-4 min-h-[100px]">
             {renderedAnswerArea}
-            {(isCorrect || message) && ( <div className={`mt-4 font-black text-sm tracking-widest animate-bounce ${isCorrect ? 'text-green-500' : 'text-amber-500'}`}>{message || 'EXCELLENT!'}</div> )}
+            {(isCorrect || message) && ( <div className={`mt-2 font-black text-xs tracking-widest animate-bounce ${isCorrect ? 'text-green-500' : 'text-amber-500'}`}>{message || 'EXCELLENT!'}</div> )}
         </div>
         
-        <div className="w-full mt-auto pt-4 border-t border-gray-50">
+        {/* 하단 버튼 */}
+        <div className="w-full mt-auto pt-2 border-t border-gray-50">
           {isCorrect ? (
-            <button onClick={processNextLevel} className="w-full py-4 bg-green-500 text-white rounded-xl font-black text-lg shadow-lg flex items-center justify-center gap-2 hover:bg-green-600 active:scale-95 transition-all">NEXT LEVEL <ArrowRight size={24}/></button>
+            <button onClick={processNextLevel} className="w-full py-3 bg-green-500 text-white rounded-xl font-black text-lg shadow-lg flex items-center justify-center gap-2 hover:bg-green-600 active:scale-95 transition-all">NEXT LEVEL <ArrowRight size={24}/></button>
           ) : (
-            <div className="flex gap-3">
-              <button onClick={handleReset} className="flex-1 py-4 bg-gray-200 text-gray-500 rounded-xl font-black text-sm uppercase flex items-center justify-center gap-2 hover:bg-gray-300 active:scale-95 transition-all"><RefreshCcw size={18}/> RESET</button>
-              <button onClick={handleBackspace} className="flex-[2] py-4 bg-indigo-600 text-white rounded-xl font-black text-lg flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-700 active:scale-95 transition-all"><Delete size={22}/> BACK</button>
+            <div className="flex gap-2">
+              <button onClick={handleReset} className="flex-1 py-3 bg-gray-200 text-gray-500 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-2 hover:bg-gray-300 active:scale-95 transition-all"><RefreshCcw size={16}/> RESET</button>
+              <button onClick={handleBackspace} className="flex-[2] py-3 bg-indigo-600 text-white rounded-xl font-black text-lg flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-700 active:scale-95 transition-all"><Delete size={20}/> BACK</button>
             </div>
           )}
         </div>
+
       </div>
     </div>
   );
