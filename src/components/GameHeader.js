@@ -1,5 +1,6 @@
 import React from 'react';
-import { Trophy, LogIn, LogOut, Wifi, WifiOff, User } from 'lucide-react';
+// 1. Trophy 대신 Coins를 임포트합니다.
+import { Coins, LogIn, LogOut, Wifi, WifiOff, User } from 'lucide-react';
 
 const GameHeader = ({ level, score, user, isOnline, onLogin, onLogout }) => {
   return (
@@ -18,7 +19,7 @@ const GameHeader = ({ level, score, user, isOnline, onLogin, onLogout }) => {
           {/* 2. 로그인 상태에 따라 다르게 표시 */}
           {user ? (
             <div className="flex items-center gap-2 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100">
-              {/* 이메일 표시 (추가된 부분) */}
+              {/* 이메일 표시 */}
               <div className="flex items-center gap-1 text-indigo-400">
                  <User size={10} />
                  <span className="text-[9px] font-bold max-w-[80px] sm:max-w-none truncate">
@@ -45,9 +46,10 @@ const GameHeader = ({ level, score, user, isOnline, onLogin, onLogout }) => {
             </button>
           )}
           
-          {/* 3. 점수 표시 */}
+          {/* 3. 점수 표시 (여기가 변경되었습니다!) */}
           <div className="flex items-center gap-1 ml-1">
-            <Trophy size={18} className="text-yellow-500"/> 
+            {/* 트로피 대신 동전(Coins) 아이콘 사용 */}
+            <Coins size={18} className="text-yellow-500"/> 
             <span>{score}</span>
           </div>
         </div>
