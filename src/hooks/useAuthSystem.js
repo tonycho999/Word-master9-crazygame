@@ -8,17 +8,16 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
   const [conflictData, setConflictData] = useState(null);
   const [message, setMessage] = useState('');
 
-  // ★ [핵심] 무한 루프 방지용 안전장치 (Ref는 값이 바뀌어도 렌더링되지 않음)
-  const isCheckingRef = useRef(false); // 지금 검사 중인가?
-  const hasCheckedRef = useRef(false); // 검사를 이미 마쳤는가?
+  // 무한 루프 방지용 안전장치
+  const isCheckingRef = useRef(false); 
+  const hasCheckedRef = useRef(false); 
 
   // 1. 데이터 동기화 함수
   const checkDataConflict = useCallback(async (userId) => {
-    // 이미 검사 중이거나, 검사를 마쳤거나, 인터넷이 없으면 -> 중단!
     if (isCheckingRef.current || hasCheckedRef.current || !navigator.onLine) return;
 
-    isCheckingRef.current = true; // "검사 시작!" 깃발 꽂기
-    console.log("🔒 [Sync] DB 데이터 확인 시작 (1회 한정)");
+    isCheckingRef.current = true; 
+    console.log("🔒 [Sync] DB 데이터 확인 시작");
 
     try {
         const currentLevel = Number(localStorage.getItem('word-game-level') || 1);
@@ -29,28 +28,26 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
         if (result.status === 'CONFLICT') {
             setConflictData({ ...result.serverData, type: 'level_mismatch' });
         } else if (result.status === 'UPDATE_LOCAL') {
-            // 충돌 없이 서버 데이터가 최신이면 조용히 업데이트
             setLevel(result.serverData.level);
             setScore(result.serverData.score);
             localStorage.setItem('word-game-level', result.serverData.level);
             localStorage.setItem('word-game-score', result.serverData.score);
             console.log("⚡ 서버 데이터로 업데이트됨");
-            hasCheckedRef.current = true; // 검사 완료 처리
+            hasCheckedRef.current = true; 
         } else {
-            hasCheckedRef.current = true; // 동기화 완료 or 내 데이터 저장됨 -> 검사 완료 처리
+            hasCheckedRef.current = true; 
         }
     } catch (e) {
         console.error(e);
     } finally {
-        isCheckingRef.current = false; // 검사 끝
+        isCheckingRef.current = false; 
     }
   }, [user, setLevel, setScore]); 
 
-  // 2. 온라인 상태 및 초기화 감지
+  // 2. 온라인 상태 감지
   useEffect(() => {
     const handleOnline = () => { 
         setIsOnline(true); 
-        // 재연결 시에는 다시 한 번 체크할 기회를 줌
         hasCheckedRef.current = false; 
         if (user) checkDataConflict(user.id); 
     };
@@ -65,15 +62,11 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
     };
   }, [user, checkDataConflict]);
 
-  // 3. 로그인 상태 감지 (여기서 무한 루프가 발생했었음)
+  // 3. 로그인 상태 감지
   useEffect(() => {
-    // 세션 가져오기
     const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) { 
-          setUser(session.user);
-          // 여기서 바로 실행하지 않고, 의존성 배열에 의해 아래 로직이 실행되도록 함
-      }
+      if (session?.user) setUser(session.user);
     };
     initSession();
     
@@ -81,7 +74,6 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
       if (session?.user) {
         setUser(session.user);
         if (event === 'SIGNED_IN') {
-             // 로그인 순간에는 강제로 체크 리셋 후 실행
              hasCheckedRef.current = false;
              setMessage('LOGIN SUCCESS!'); 
              setTimeout(() => setMessage(''), 2000); 
@@ -92,15 +84,14 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
       }
     });
     return () => subscription.unsubscribe();
-  }, []); // ★ 의존성 배열 비움! (최초 1회만 리스너 등록)
+  }, []); 
 
-  // 4. 유저가 바뀔 때 딱 한번만 체크 실행
+  // 4. 유저 변경 시 체크
   useEffect(() => {
       if (user && !hasCheckedRef.current) {
           checkDataConflict(user.id);
       }
   }, [user, checkDataConflict]);
-
 
   // 5. 액션 핸들러들
   const handleResolveConflict = async (choice) => {
@@ -111,39 +102,53 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
       const newLevel = Number(conflictData.level);
       const newScore = Number(conflictData.score);
 
-      // 1. 상태 업데이트 (게임 로직이 감지해서 단어 바꿈)
       setLevel(newLevel); 
       setScore(newScore);
-      
-      // 2. 로컬 저장
       localStorage.setItem('word-game-level', newLevel); 
       localStorage.setItem('word-game-score', newScore);
       
       setMessage('LOADED SERVER DATA!');
       setConflictData(null); 
-      hasCheckedRef.current = true; // 해결했으니 다시 체크 안 함
-
-      // ★ 새로고침 제거 (이제 상태가 바뀌면 useGameLogic이 알아서 단어를 바꿉니다)
-
+      hasCheckedRef.current = true; 
     } else {
       await saveProgress(user.id, levelRef.current, scoreRef.current, user.email);
       setConflictData(null); 
-      hasCheckedRef.current = true; // 해결했으니 다시 체크 안 함
+      hasCheckedRef.current = true; 
       setMessage('SAVED LOCAL DATA!');
     }
     setTimeout(() => setMessage(''), 2000);
   };
 
+  // ★ [핵심 수정] 로그아웃 시 데이터 초기화 (악용 방지)
   const handleLogout = async () => {
     playSound('click');
     try { 
+        // 1. 서버 로그아웃
         await logout(); 
-        setUser(null); 
-        hasCheckedRef.current = false; // 로그아웃하면 체크 기록 초기화
-        setMessage('LOGGED OUT'); 
-        setTimeout(() => { setMessage(''); window.location.reload(); }, 1000); 
     } catch (e) { 
-        window.location.reload(); 
+        console.error(e); 
+    } finally {
+        // 2. [중요] 내 폰의 점수 데이터를 1레벨/300점으로 강제 초기화
+        localStorage.removeItem('word-game-level');
+        localStorage.removeItem('word-game-score');
+        
+        // 3. 좀비 세션 방지 (로그인 토큰 삭제)
+        Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith('sb-')) localStorage.removeItem(key);
+        });
+
+        // 4. 화면 즉시 반영
+        setUser(null);
+        setLevel(1);
+        setScore(300);
+        hasCheckedRef.current = false;
+        setMessage('RESET TO LV.1'); 
+        
+        // 5. 확실한 초기화를 위해 새로고침
+        setTimeout(() => { 
+            setMessage(''); 
+            window.location.reload(); 
+        }, 1000); 
     }
   };
 
