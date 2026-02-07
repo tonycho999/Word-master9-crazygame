@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase, logout, saveProgress, loadProgress } from '../supabase'; // loginWithGoogle 제거
+import { supabase, logout, saveProgress, loadProgress } from '../supabase'; 
 import { wordDatabase, twoWordDatabase, threeWordDatabase, fourWordDatabase, fiveWordDatabase, LEVEL_CONFIG } from '../data/wordDatabase';
 
 // 분리된 컴포넌트 임포트
@@ -12,7 +12,7 @@ import AnswerBoard from './AnswerBoard';
 import { Mail, X, Send } from 'lucide-react';
 
 // [배포 버전]
-const CURRENT_VERSION = '1.3.4'; 
+const CURRENT_VERSION = '1.3.5'; 
 
 const WordGuessGame = () => {
   // --- [1] 상태 관리 ---
@@ -22,7 +22,7 @@ const WordGuessGame = () => {
   // 앱 설치 이벤트 저장용 상태
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
-  // [NEW] 이메일 로그인 관련 상태
+  // 이메일 로그인 관련 상태
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [inputEmail, setInputEmail] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -154,13 +154,12 @@ const WordGuessGame = () => {
     return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
   }, [user, checkDataConflict]);
 
-  // [수정됨] 로그인 인증 상태 감지 (매직 링크 클릭 후 돌아왔을 때 처리)
+  // 로그인 인증 상태 감지 (매직 링크 클릭 후 돌아왔을 때 처리)
   useEffect(() => {
     // 1. 초기 세션 확인
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
-        // 이미 로그인된 상태라면 저장
         saveProgress(session.user.id, level, score, session.user.email);
         checkDataConflict(session.user.id);
       } else {
@@ -169,12 +168,10 @@ const WordGuessGame = () => {
     });
 
     // 2. 로그인 상태 변경 감지
-    // (사용자가 이메일에서 '로그인하기' 버튼을 누르고 돌아오면 여기서 'SIGNED_IN' 이벤트가 발생)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUser(session.user);
         
-        // ★ 중요: 매직 링크 타고 들어와서 로그인이 완료된 순간 DB에 저장!
         if (event === 'SIGNED_IN') {
              await saveProgress(session.user.id, level, score, session.user.email);
              setMessage('LOGIN SUCCESS!');
@@ -202,7 +199,7 @@ const WordGuessGame = () => {
     setTimeout(() => setMessage(''), 2000);
   };
 
-  // [NEW] 로그인 버튼 클릭 시 모달 열기
+  // 로그인 버튼 클릭 시 모달 열기
   const handleLoginClick = () => {
     if (!isOnline) {
         setMessage("OFFLINE: Can't Login");
@@ -213,7 +210,7 @@ const WordGuessGame = () => {
     setShowLoginModal(true);
   };
 
-  // [NEW] 이메일 매직 링크 전송 함수
+  // 이메일 매직 링크 전송 함수
   const sendMagicLink = async (e) => {
     e.preventDefault();
     if (!inputEmail || !inputEmail.includes('@')) {
@@ -229,7 +226,6 @@ const WordGuessGame = () => {
         const { error } = await supabase.auth.signInWithOtp({
             email: inputEmail,
             options: {
-                // 현재 페이지로 다시 돌아오도록 설정
                 emailRedirectTo: window.location.href,
             },
         });
@@ -238,13 +234,17 @@ const WordGuessGame = () => {
 
         setMessage('Check your email!');
         setInputEmail('');
-        setShowLoginModal(false); // 모달 닫기
+        setShowLoginModal(false); 
     } catch (error) {
         console.error(error);
-        setMessage('Error sending email');
+        if (error.status === 429 || error.message.includes('rate limit')) {
+            setMessage('Too many requests. Wait a bit.');
+        } else {
+            setMessage('Error sending email');
+        }
     } finally {
         setIsSendingEmail(false);
-        setTimeout(() => setMessage(''), 3000); // 메시지 좀 더 오래 표시
+        setTimeout(() => setMessage(''), 3000);
     }
   };
 
@@ -320,13 +320,12 @@ const WordGuessGame = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none relative">
       
-      {/* 데이터 충돌 해결 모달 */}
       <SyncConflictModal conflictData={conflictData} currentLevel={level} currentScore={score} onResolve={handleResolveConflict} />
 
-      {/* [NEW] 이메일 로그인 모달 */}
+      {/* [NEW] 이메일 로그인 모달 (animate-bounce 제거됨) */}
       {showLoginModal && (
           <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl p-6 max-w-xs w-full shadow-2xl animate-bounce">
+              <div className="bg-white rounded-2xl p-6 max-w-xs w-full shadow-2xl">
                   <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xl font-black text-indigo-600 flex items-center gap-2">
                         <Mail size={24}/> LOGIN
@@ -363,7 +362,6 @@ const WordGuessGame = () => {
 
       <div className="bg-white rounded-[2rem] p-4 w-full max-w-md shadow-2xl flex flex-col items-center border-t-8 border-indigo-500">
         
-        {/* GameHeader: 로그인 버튼 클릭 시 handleLoginClick(모달 열기) 호출 */}
         <GameHeader 
           level={level} score={score} user={user} isOnline={isOnline} 
           onLogin={handleLoginClick} onLogout={handleLogout}
