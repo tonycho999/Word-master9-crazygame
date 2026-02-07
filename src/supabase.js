@@ -12,8 +12,6 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // 1. 로그인 (매직 링크 방식 - WordGuessGame.js에서 직접 호출하지만, 비상용으로 남겨둠)
 export const loginWithGoogle = async () => {
-  // 현재는 메인 컴포넌트(WordGuessGame.js)에서 모달창으로 처리하므로 
-  // 이 함수는 거의 사용되지 않지만, 호환성을 위해 남겨둡니다.
   const email = window.prompt("Enter email for Magic Link:");
   if (!email) return;
   const { error } = await supabase.auth.signInWithOtp({ email });
@@ -27,27 +25,23 @@ export const logout = async () => {
   if (error) console.error('Logout Error:', error);
 };
 
-// 3. [최종 수정] 데이터 저장 (upsert 사용 + 이메일 저장 추가)
-// 파라미터에 email을 추가했습니다.
+// 3. [수정됨] 데이터 저장 (data 변수 제거하여 빌드 에러 해결)
 export const saveProgress = async (userId, level, score, email) => {
   try {
-    // DB 컬럼명에 맞게 데이터 준비
     const updates = {
-      userid: userId,    // 컬럼명: userid
+      userid: userId,    
       level: Number(level),
       score: Number(score),
       updated_at: new Date(),
     };
 
-    // 이메일이 전달되었을 때만 updates 객체에 포함 (빈 값 덮어쓰기 방지)
     if (email) {
-      updates.email = email; // 컬럼명: email
+      updates.email = email;
     }
 
-    // upsert: 데이터가 없으면 insert, 있으면 update를 한 번에 처리
-    // onConflict: 'userid' -> userid가 같은 행이 있으면 덮어쓴다는 뜻
-    const { data, error } = await supabase
-      .from('game_progress') // 테이블 이름
+    // [수정] 여기서 { data, error } 에서 data를 지웠습니다.
+    const { error } = await supabase
+      .from('game_progress') 
       .upsert(updates, { onConflict: 'userid' });
 
     if (error) throw error;
@@ -59,14 +53,14 @@ export const saveProgress = async (userId, level, score, email) => {
   }
 };
 
-// 4. [최종 수정] 데이터 불러오기
+// 4. 데이터 불러오기
 export const loadProgress = async (userId) => {
   try {
     const { data, error } = await supabase
       .from('game_progress')
       .select('*')
       .eq('userid', userId)
-      .maybeSingle(); // 데이터가 0개거나 1개일 때 안전하게 처리
+      .maybeSingle(); 
 
     if (error) throw error;
     return data;
