@@ -4,7 +4,7 @@ import { supabase, loginWithGoogle, logout, saveProgress, loadProgress } from '.
 import { wordDatabase, twoWordDatabase, threeWordDatabase, fourWordDatabase, fiveWordDatabase, LEVEL_CONFIG } from '../data/wordDatabase';
 
 // [배포 버전]
-const CURRENT_VERSION = '1.2.1'; 
+const CURRENT_VERSION = '1.2.3'; 
 
 const WordGuessGame = () => {
   // --- 상태 관리 ---
@@ -31,7 +31,7 @@ const WordGuessGame = () => {
   const [message, setMessage] = useState('');
   const [isFlashing, setIsFlashing] = useState(false);
   
-  // [수정됨] 힌트 메시지도 저장된 값으로 초기화 (새로고침 유지용)
+  // 힌트 메시지 저장
   const [hintMessage, setHintMessage] = useState(() => localStorage.getItem('word-game-hint-message') || ''); 
   
   const [conflictData, setConflictData] = useState(null); 
@@ -78,7 +78,7 @@ const WordGuessGame = () => {
         [523, 659, 783, 1046].forEach((f, i) => {
           const o = ctx.createOscillator(); const g = ctx.createGain();
           o.connect(g); g.connect(ctx.destination); o.frequency.value = f;
-          g.gain.setValueAtTime(0.1, ctx.currentTime + i*0.08); o.start(ctx.currentTime + i*0.08); o.stop(ctx.currentTime + i*0.1); // 짧게 수정
+          g.gain.setValueAtTime(0.1, ctx.currentTime + i*0.08); o.start(ctx.currentTime + i*0.08); o.stop(ctx.currentTime + i*0.1); 
         });
       } else if (type === 'reward') {
         [440, 554, 659, 880, 1108].forEach((f, i) => {
@@ -139,7 +139,7 @@ const WordGuessGame = () => {
   const handleLogin = async () => { playSound('click'); await loginWithGoogle(); };
   const handleLogout = async () => { playSound('click'); await logout(); setUser(null); setMessage('LOGGED OUT'); setTimeout(() => setMessage(''), 1500); };
 
-  // --- 저장 (hintMessage 추가됨) ---
+  // --- 저장 ---
   useEffect(() => {
     localStorage.setItem('word-game-level', level);
     localStorage.setItem('word-game-score', score);
@@ -150,7 +150,6 @@ const WordGuessGame = () => {
     localStorage.setItem('word-game-selected', JSON.stringify(selectedLetters));
     localStorage.setItem('word-game-solved-data', JSON.stringify(solvedWordsData));
     localStorage.setItem('word-game-hint-stage', hintStage);
-    // [수정됨] 힌트 메시지 저장
     localStorage.setItem('word-game-hint-message', hintMessage);
     
     if (user && !conflictData) {
@@ -220,7 +219,6 @@ const WordGuessGame = () => {
     setSolvedWordsData([]); 
     setIsCorrect(false);
     
-    // [중요] 새 레벨에서는 힌트 초기화
     setHintStage(0);
     setHintMessage('');
     localStorage.removeItem('word-game-hint-message');
@@ -237,7 +235,7 @@ const WordGuessGame = () => {
     return `${count} WORD${count > 1 ? 'S' : ''}`; 
   }, [currentWord]);
 
-  // --- 힌트 로직 ---
+  // --- 힌트 로직 (수정됨: G... / G...F) ---
   const handleHint = () => {
     playSound('click');
     if (isCorrect) return;
@@ -245,19 +243,25 @@ const WordGuessGame = () => {
     const words = currentWord.split(' ');
 
     if (hintStage === 0) {
+        // 1단계: 첫글자 + ... (예: G...)
         if (score >= 100) { 
             setScore(s => s - 100); 
             setHintStage(1); 
-            const firstLetters = words.map(w => w[0].toUpperCase()).join(' / ');
-            setHintMessage(`FIRST LETTERS: ${firstLetters}`);
+            const hintText = words.map(w => w[0].toUpperCase() + '...').join('  ');
+            setHintMessage(`HINT: ${hintText}`);
         } else { setMessage("Need 100 Points!"); setTimeout(() => setMessage(''), 1500); }
     } 
     else if (hintStage === 1) {
+        // 2단계: 첫글자 + ... + 마지막글자 (예: G...F)
         if (score >= 200) { 
             setScore(s => s - 200); 
             setHintStage(2); 
-            const lastLetters = words.map(w => w[w.length-1].toUpperCase()).join(' / ');
-            setHintMessage(`LAST LETTERS: ${lastLetters}`);
+            const hintText = words.map(w => 
+                w.length > 1 
+                ? w[0].toUpperCase() + '...' + w[w.length-1].toUpperCase() 
+                : w[0].toUpperCase() // 1글자짜리 단어 예외처리
+            ).join('  ');
+            setHintMessage(`HINT: ${hintText}`);
         } else { setMessage("Need 200 Points!"); setTimeout(() => setMessage(''), 1500); }
     } 
     else if (hintStage === 2) {
@@ -280,7 +284,7 @@ const WordGuessGame = () => {
 
   const getHintButtonText = () => {
       if (hintStage === 0) return '1ST LETTER (100P)';
-      if (hintStage === 1) return 'LAST LETTER (200P)';
+      if (hintStage === 1) return '1ST & LAST (200P)'; // 버튼 텍스트도 변경
       if (hintStage === 2) return 'SHOW SPACES (300P)';
       return 'FLASH ANSWER (500P)';
   };
@@ -350,6 +354,7 @@ const WordGuessGame = () => {
 
   // --- 렌더링 ---
   const renderedAnswerArea = useMemo(() => {
+    // 1. Flash
     if (isFlashing) {
          return (
              <div className="flex flex-col gap-3 items-center w-full animate-pulse">
@@ -366,6 +371,7 @@ const WordGuessGame = () => {
          );
     }
 
+    // 2. 이미 맞춘 단어들
     const solvedArea = solvedWordsData.map((data, idx) => (
         <div key={`solved-${idx}`} className="flex gap-1 justify-center flex-wrap mb-2 animate-bounce">
             {data.letters.map(l => (
@@ -378,6 +384,7 @@ const WordGuessGame = () => {
 
     let inputArea;
 
+    // 3-A. [미스터리 모드] 힌트 3단계 미만 -> 한 줄로 쭉
     if (!isCorrect && hintStage < 3) {
         inputArea = (
             <div className="flex flex-wrap gap-1 md:gap-2 w-full justify-center items-center min-h-[60px]">
@@ -391,16 +398,39 @@ const WordGuessGame = () => {
                 )}
             </div>
         );
-    } else {
+    } 
+    // 3-B. [구조 공개 모드] 힌트 3단계 이상 -> 빈칸(회색 박스) 표시
+    else {
+         const allWords = currentWord.split(' ');
+         const solvedWordsList = solvedWordsData.map(d => d.word.toUpperCase());
+         const remainingWords = allWords.filter(w => !solvedWordsList.includes(w.toUpperCase()));
+         let letterIndex = 0;
+
          inputArea = (
-            <div className="flex flex-wrap gap-1 md:gap-2 w-full justify-center items-center min-h-[60px]">
-                {selectedLetters.map((l) => (
-                    <div key={l.id} className="w-10 h-12 sm:w-12 sm:h-14 border-b-4 border-indigo-600 bg-indigo-50 text-indigo-800 rounded-t-lg flex items-center justify-center text-xl font-black -translate-y-1">
-                      {l.char.toUpperCase()}
-                    </div>
-                ))}
+            <div className="flex flex-col gap-3 w-full items-center">
+                {remainingWords.map((word, idx) => {
+                    const wordLen = word.length;
+                    const currentLetters = selectedLetters.slice(letterIndex, letterIndex + wordLen);
+                    letterIndex += wordLen;
+                    const emptyCount = Math.max(0, wordLen - currentLetters.length);
+                    const emptySlots = Array(emptyCount).fill(0);
+
+                    return (
+                        <div key={`rem-${idx}`} className="flex gap-2 justify-center flex-wrap min-h-[50px]">
+                            {currentLetters.map(l => (
+                                <div key={l.id} className="w-10 h-12 sm:w-12 sm:h-14 border-b-4 border-indigo-600 bg-indigo-50 text-indigo-800 rounded-t-lg flex items-center justify-center text-xl font-black -translate-y-1">
+                                    {l.char.toUpperCase()}
+                                </div>
+                            ))}
+                            {emptySlots.map((_, i) => (
+                                <div key={`empty-${i}`} className="w-10 h-12 sm:w-12 sm:h-14 border-b-4 border-gray-200 bg-gray-100 rounded-t-lg flex items-center justify-center">
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })}
             </div>
-        );
+         );
     }
 
     return (
