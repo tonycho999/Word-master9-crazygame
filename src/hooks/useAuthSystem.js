@@ -11,21 +11,21 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
   // 1. 데이터 동기화 함수
   const checkDataConflict = useCallback(async (userId) => {
     if (!navigator.onLine) return;
-    
-    // [중요] 비교 전 확실하게 숫자로 변환
     const currentLevel = Number(localStorage.getItem('word-game-level') || 1);
     const currentScore = Number(localStorage.getItem('word-game-score') || 300);
     
+    // DB와 통신 (딱 한 번!)
     const result = await syncGameData(userId, currentLevel, currentScore, user?.email);
 
     if (result.status === 'CONFLICT') {
       setConflictData({ ...result.serverData, type: 'level_mismatch' });
     } else if (result.status === 'UPDATE_LOCAL') {
+      // 충돌 없이 서버 데이터가 더 최신이면 조용히 업데이트
       setLevel(result.serverData.level);
       setScore(result.serverData.score);
       localStorage.setItem('word-game-level', result.serverData.level);
       localStorage.setItem('word-game-score', result.serverData.score);
-      console.log("⚡ 서버 데이터로 업데이트됨");
+      console.log("⚡ 서버 데이터로 자동 업데이트됨");
     }
   }, [user, setLevel, setScore]); 
 
@@ -38,14 +38,9 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
         if (user) checkDataConflict(user.id); 
     };
     const handleOffline = () => { setIsOnline(false); setMessage('OFFLINE MODE'); };
-    
     window.addEventListener('online', handleOnline); 
     window.addEventListener('offline', handleOffline);
-    
-    return () => { 
-        window.removeEventListener('online', handleOnline); 
-        window.removeEventListener('offline', handleOffline); 
-    };
+    return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
   }, [user, checkDataConflict]);
 
   // 3. 로그인 상태 감지
@@ -67,49 +62,42 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
     return () => subscription.unsubscribe();
   }, [checkDataConflict]);
 
-  // 4. 액션 핸들러들
+  // ★ [핵심 수정] 루프 제거: 새로고침(reload)을 하지 않고 상태만 업데이트
   const handleResolveConflict = async (choice) => {
     playSound('click'); 
     if (!conflictData || !user) return;
     
     if (choice === 'server') {
-      // [서버 데이터 선택 시]
-      // 1. 로컬 스토리지에 확실하게 저장 (숫자로 변환)
+      // [서버 데이터 선택]
       const newLevel = Number(conflictData.level);
       const newScore = Number(conflictData.score);
+
+      // 1. 상태 업데이트 (이러면 useGameLogic이 알아서 감지함)
+      setLevel(newLevel); 
+      setScore(newScore);
       
+      // 2. 로컬 저장
       localStorage.setItem('word-game-level', newLevel); 
       localStorage.setItem('word-game-score', newScore);
       
       setMessage('LOADED SERVER DATA!');
+      setConflictData(null); 
       
-      // [핵심 수정] 서버 데이터를 가져올 때는 "새로고침"을 해야 루프가 확실히 끊기고
-      // 게임 단어(Word)도 해당 레벨에 맞게 다시 로딩됩니다.
-      // (이때는 인터넷이 연결된 상태이므로 화면 깨짐 현상이 없습니다!)
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
+      // ★ window.location.reload() 삭제됨! 루프 해결!
 
     } else {
-      // [내 기기 데이터 선택 시]
-      // 서버에 내 데이터를 덮어씌움 (새로고침 필요 없음)
+      // [내 기기 데이터 선택]
       await saveProgress(user.id, levelRef.current, scoreRef.current, user.email);
       setConflictData(null); 
       setMessage('SAVED LOCAL DATA!');
-      setTimeout(() => setMessage(''), 2000);
     }
+    setTimeout(() => setMessage(''), 2000);
   };
 
   const handleLogout = async () => {
     playSound('click');
-    try { 
-        await logout(); 
-        setUser(null); 
-        setMessage('LOGGED OUT'); 
-        setTimeout(() => { setMessage(''); window.location.reload(); }, 1000); 
-    } catch (e) { 
-        window.location.reload(); 
-    }
+    try { await logout(); setUser(null); setMessage('LOGGED OUT'); setTimeout(() => { setMessage(''); window.location.reload(); }, 1000); } 
+    catch (e) { window.location.reload(); }
   };
 
   return {
