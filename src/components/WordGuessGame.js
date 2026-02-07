@@ -12,7 +12,7 @@ import AnswerBoard from './AnswerBoard';
 import { Mail, X, Send } from 'lucide-react';
 
 // [배포 버전]
-const CURRENT_VERSION = '1.3.8'; 
+const CURRENT_VERSION = '1.3.9'; 
 
 const WordGuessGame = () => {
   // --- [1] 상태 관리 ---
@@ -263,7 +263,22 @@ const WordGuessGame = () => {
     }
   };
 
-  const handleLogout = async () => { playSound('click'); await logout(); setUser(null); setMessage('LOGGED OUT'); setTimeout(() => setMessage(''), 1500); };
+  // ★ [수정됨] 로그아웃 시 강제 새로고침 (확실한 로그아웃)
+  const handleLogout = async () => { 
+    playSound('click'); 
+    try {
+        await logout(); 
+        setUser(null); 
+        setMessage('LOGGED OUT'); 
+        setTimeout(() => { 
+            setMessage(''); 
+            window.location.reload(); 
+        }, 1000);
+    } catch (error) {
+        console.error(error);
+        window.location.reload();
+    }
+  };
 
   // --- [4] 자동 저장 및 광고 ---
   useEffect(() => {
