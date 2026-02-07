@@ -2,6 +2,7 @@ import React from 'react';
 import { Lightbulb, RotateCcw, PlayCircle, RefreshCcw, Delete, ArrowRight } from 'lucide-react';
 
 const GameControls = ({
+  children, // <--- 이 부분이 추가되었습니다 (AnswerBoard를 받기 위해)
   category,
   wordType,
   wordCountDisplay,
@@ -83,7 +84,8 @@ const GameControls = ({
         <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-gray-300 text-[10px] font-bold">ANSWER</span>
       </div>
 
-      {/* (AnswerBoard가 여기에 들어가지만, Controls 파일에서는 하단 버튼만 렌더링) */}
+      {/* 👇 여기에 AnswerBoard가 렌더링됩니다! (children) */}
+      {children}
 
       {/* 하단 버튼 (Reset/Back/Next) */}
       <div className="w-full mt-auto pt-2 border-t border-gray-50">
