@@ -8,7 +8,7 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
   const [conflictData, setConflictData] = useState(null);
   const [message, setMessage] = useState('');
 
-  // 1. [순서 변경] 함수 정의를 위로 올림 (useEffect보다 먼저 있어야 함)
+  // 1. 데이터 동기화 함수 (useEffect보다 위에 있어야 함)
   const checkDataConflict = useCallback(async (userId) => {
     if (!navigator.onLine) return;
     const currentLevel = Number(localStorage.getItem('word-game-level') || 1);
@@ -25,9 +25,9 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
       localStorage.setItem('word-game-score', result.serverData.score);
       console.log("⚡ 서버 데이터로 업데이트됨");
     }
-  }, [user, setLevel, setScore]); // 의존성 배열 유지
+  }, [user, setLevel, setScore]); 
 
-  // 2. 온라인 상태 감지 (이제 checkDataConflict를 안전하게 사용 가능)
+  // 2. 온라인 상태 감지
   useEffect(() => {
     const handleOnline = () => { 
         setIsOnline(true); 
@@ -44,9 +44,9 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
         window.removeEventListener('online', handleOnline); 
         window.removeEventListener('offline', handleOffline); 
     };
-  }, [user, checkDataConflict]); // ★ checkDataConflict 추가됨
+  }, [user, checkDataConflict]);
 
-  // 3. 로그인 상태 감지
+  // 3. 로그인 상태 감지 (Auth Listener)
   useEffect(() => {
     const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -66,24 +66,49 @@ export const useAuthSystem = (playSound, levelRef, scoreRef, setLevel, setScore)
   }, [checkDataConflict]);
 
   // 4. 액션 핸들러들
+
+  // ★ [수정됨] 충돌 해결 시 새로고침 없이 상태만 업데이트 (오프라인 화면 깨짐 방지)
   const handleResolveConflict = async (choice) => {
-    playSound('click'); if (!conflictData || !user) return;
+    playSound('click'); 
+    if (!conflictData || !user) return;
+    
     if (choice === 'server') {
-      setLevel(conflictData.level); setScore(conflictData.score);
-      localStorage.setItem('word-game-level', conflictData.level); localStorage.setItem('word-game-score', conflictData.score);
-      setConflictData(null); setMessage('LOADED SERVER DATA!');
-      window.location.reload(); 
+      // 서버 데이터를 선택했을 때:
+      // 1. 즉시 화면(State) 업데이트
+      setLevel(conflictData.level); 
+      setScore(conflictData.score);
+      
+      // 2. 로컬 저장소 업데이트
+      localStorage.setItem('word-game-level', conflictData.level); 
+      localStorage.setItem('word-game-score', conflictData.score);
+      
+      // 3. 모달 닫기 및 알림
+      setConflictData(null); 
+      setMessage('LOADED SERVER DATA!');
+      
+      // (중요) window.location.reload() 제거됨! -> 이제 화면 안 깨집니다.
+
     } else {
+      // 내 데이터를 선택했을 때: 서버에 덮어쓰기
       await saveProgress(user.id, levelRef.current, scoreRef.current, user.email);
-      setConflictData(null); setMessage('SAVED LOCAL DATA!');
+      setConflictData(null); 
+      setMessage('SAVED LOCAL DATA!');
     }
+    
     setTimeout(() => setMessage(''), 2000);
   };
 
   const handleLogout = async () => {
     playSound('click');
-    try { await logout(); setUser(null); setMessage('LOGGED OUT'); setTimeout(() => { setMessage(''); window.location.reload(); }, 1000); } 
-    catch (e) { window.location.reload(); }
+    try { 
+        await logout(); 
+        setUser(null); 
+        setMessage('LOGGED OUT'); 
+        // 로그아웃은 확실한 초기화를 위해 새로고침 유지 (인터넷 연결 시 권장)
+        setTimeout(() => { setMessage(''); window.location.reload(); }, 1000); 
+    } catch (e) { 
+        window.location.reload(); 
+    }
   };
 
   return {
