@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'; // useMemo 제거됨
+import { useState, useEffect, useCallback } from 'react';
 import { wordDatabase, twoWordDatabase, threeWordDatabase, fourWordDatabase, fiveWordDatabase, LEVEL_CONFIG } from '../data/wordDatabase';
 
 export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
@@ -13,25 +13,57 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
   const [hintMessage, setHintMessage] = useState(() => localStorage.getItem('word-game-hint-message') || '');
   const [isFlashing, setIsFlashing] = useState(false);
 
-  // 단어 로드
+  // [핵심 수정 1] 레벨에 맞는 단어를 불러오는 함수
   const loadNewWord = useCallback(() => {
+    // 확률 설정 가져오기
     const config = (LEVEL_CONFIG && LEVEL_CONFIG.find(c => level <= c.maxLevel)) || LEVEL_CONFIG[LEVEL_CONFIG.length - 1];
-    const rand = Math.random() * 100; let cumProb = 0; let targetWordCount = 1;
-    for (const [count, prob] of Object.entries(config.probs)) { cumProb += prob; if (rand < cumProb) { targetWordCount = Number(count); break; } }
     
+    // 단어 개수 뽑기 (확률 기반)
+    const rand = Math.random() * 100; 
+    let cumProb = 0; 
+    let targetWordCount = 1;
+    for (const [count, prob] of Object.entries(config.probs)) { 
+        cumProb += prob; 
+        if (rand < cumProb) { targetWordCount = Number(count); break; } 
+    }
+    
+    // DB 선택
     let targetPool = wordDatabase;
-    if (targetWordCount === 2) targetPool = twoWordDatabase; else if (targetWordCount === 3) targetPool = threeWordDatabase; else if (targetWordCount === 4) targetPool = fourWordDatabase; else if (targetWordCount === 5) targetPool = fiveWordDatabase;
+    if (targetWordCount === 2) targetPool = twoWordDatabase; 
+    else if (targetWordCount === 3) targetPool = threeWordDatabase; 
+    else if (targetWordCount === 4) targetPool = fourWordDatabase; 
+    else if (targetWordCount === 5) targetPool = fiveWordDatabase;
     
-    const magicNumber = 17; const fixedIndex = ((level * magicNumber)) % targetPool.length; const selectedPick = targetPool[fixedIndex] || wordDatabase[0];
+    // 레벨에 따른 고정 인덱스 (매직 넘버 활용)
+    const magicNumber = 17; 
+    const fixedIndex = ((level * magicNumber)) % targetPool.length; 
+    const selectedPick = targetPool[fixedIndex] || wordDatabase[0];
     
-    setCurrentWord(selectedPick.word); setCategory(selectedPick.category); setWordType(selectedPick.type ? selectedPick.type.toUpperCase() : 'NORMAL');
+    // 상태 업데이트
+    setCurrentWord(selectedPick.word); 
+    setCategory(selectedPick.category); 
+    setWordType(selectedPick.type ? selectedPick.type.toUpperCase() : 'NORMAL');
+    
     const chars = selectedPick.word.replace(/\s/g, '').split('').map((char, i) => ({ char, id: `l-${Date.now()}-${i}-${Math.random()}` })).sort(() => Math.random() - 0.5);
-    setScrambledLetters(chars); setSelectedLetters([]); setSolvedWordsData([]); setIsCorrect(false); setHintStage(0); setHintMessage(''); setIsFlashing(false);
-  }, [level]);
+    
+    setScrambledLetters(chars); 
+    setSelectedLetters([]); 
+    setSolvedWordsData([]); 
+    setIsCorrect(false); 
+    setHintStage(0); 
+    setHintMessage(''); 
+    setIsFlashing(false);
+    
+    console.log(`🆕 [새 단어 로드] Level: ${level}, Word: ${selectedPick.word}`);
+  }, [level]); // ★중요★ level이 바뀔 때만 이 함수가 재생성됨
 
-  useEffect(() => { if (!currentWord) loadNewWord(); }, [currentWord, loadNewWord]);
+  // [핵심 수정 2] 초기 실행 및 "레벨 변경 시" 자동 실행
+  useEffect(() => {
+    // 단어가 없거나, 레벨이 바뀌었을 때 실행
+    loadNewWord();
+  }, [level, loadNewWord]); 
 
-  // 정답 체크
+  // 정답 체크 (변경 없음)
   useEffect(() => {
     if (!currentWord) return;
     const enteredStr = selectedLetters.map(l => l.char).join('').toUpperCase();
@@ -47,7 +79,7 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
     }
   }, [selectedLetters, currentWord, solvedWordsData, playSound]);
 
-  // 힌트 처리
+  // 힌트 처리 (변경 없음)
   const handleHint = () => {
     playSound('click'); if (isCorrect) return;
     const words = currentWord.split(' '); let cost = 0; let msg = ''; let nextStage = hintStage;
@@ -61,13 +93,12 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
     else { setMessage(`Need ${cost} Points!`); setTimeout(() => setMessage(''), 1500); }
   };
 
-  // 기타 액션
   const handleShuffle = () => { playSound('click'); setScrambledLetters(prev => [...prev].sort(() => Math.random() - 0.5)); };
   const handleLetterClick = (l) => { playSound('click'); setSelectedLetters(p => [...p, l]); setScrambledLetters(p => p.filter(i => i.id !== l.id)); };
   const handleReset = () => { playSound('click'); setScrambledLetters(p => [...p, ...selectedLetters]); setSelectedLetters([]); };
   const handleBackspace = () => { if(selectedLetters.length > 0) { playSound('click'); const last = selectedLetters[selectedLetters.length-1]; setSelectedLetters(p => p.slice(0, -1)); setScrambledLetters(p => [...p, last]); } };
 
-  // 자동 저장 (LocalStorage)
+  // 자동 저장
   useEffect(() => {
     localStorage.setItem('word-game-current-word', currentWord); localStorage.setItem('word-game-category', category);
     localStorage.setItem('word-game-word-type', wordType); localStorage.setItem('word-game-scrambled', JSON.stringify(scrambledLetters));
@@ -78,6 +109,6 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
   return {
     currentWord, category, wordType, scrambledLetters, selectedLetters, solvedWordsData, isCorrect, hintStage, hintMessage, isFlashing,
     setScrambledLetters, setSelectedLetters, setSolvedWordsData, setIsCorrect, setHintStage, setHintMessage, setCurrentWord,
-    handleHint, handleShuffle, handleLetterClick, handleReset, handleBackspace
+    handleHint, handleShuffle, handleLetterClick, handleReset, handleBackspace, loadNewWord // loadNewWord 내보냄
   };
 };
