@@ -4,7 +4,7 @@ import { supabase, loginWithGoogle, logout, saveProgress, loadProgress } from '.
 import { wordDatabase, twoWordDatabase, threeWordDatabase, fourWordDatabase, fiveWordDatabase, LEVEL_CONFIG } from '../data/wordDatabase';
 
 // [배포 버전]
-const CURRENT_VERSION = '1.2.7'; 
+const CURRENT_VERSION = '1.2.8'; 
 
 const WordGuessGame = () => {
   // --- 상태 관리 ---
@@ -351,6 +351,7 @@ const WordGuessGame = () => {
 
   // --- 렌더링 ---
   const renderedAnswerArea = useMemo(() => {
+    // 1. Flash
     if (isFlashing) {
          return (
              <div className="flex flex-col gap-2 items-center w-full animate-pulse">
@@ -367,6 +368,24 @@ const WordGuessGame = () => {
          );
     }
 
+    // [NEW] 정답이 완성되었으면 -> 원래 문장 순서대로 강제 정렬!
+    if (isCorrect) {
+        return (
+            <div className="flex flex-col gap-2 w-full items-center mb-2 animate-bounce">
+                {currentWord.split(' ').map((word, wIdx) => (
+                    <div key={`final-${wIdx}`} className="flex gap-1 justify-center flex-wrap">
+                        {word.split('').map((char, cIdx) => (
+                           <div key={`${wIdx}-${cIdx}`} className="w-10 h-12 sm:w-12 sm:h-14 border-2 border-green-500 bg-green-50 text-green-600 rounded-lg flex items-center justify-center text-base font-bold">
+                                {char.toUpperCase()}
+                           </div>
+                        ))}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    // 2. 이미 맞춘 단어 (중간 단계: 맞춘 순서대로 쌓임)
     const solvedArea = solvedWordsData.map((data, idx) => (
         <div key={`solved-${idx}`} className="flex gap-1 justify-center flex-wrap mb-2 animate-bounce">
             {data.letters.map(l => (
@@ -380,8 +399,9 @@ const WordGuessGame = () => {
     let inputArea;
 
     if (!isCorrect && hintStage < 3) {
+        // [미스터리 모드]
         inputArea = (
-            <div className="flex flex-wrap gap-1 md:gap-2 w-full justify-center items-center min-h-[50px]">
+            <div className="flex flex-wrap gap-1 md:gap-2 w-full justify-center items-center min-h-[60px]">
                 {selectedLetters.map((l) => (
                     <div key={l.id} className="w-10 h-12 sm:w-12 sm:h-14 border-2 border-indigo-600 bg-indigo-50 text-indigo-800 rounded-lg flex items-center justify-center text-base font-bold -translate-y-1">
                       {l.char.toUpperCase()}
@@ -393,6 +413,7 @@ const WordGuessGame = () => {
             </div>
         );
     } else {
+         // [공개 모드]
          const allWords = currentWord.split(' ');
          const solvedWordsList = solvedWordsData.map(d => d.word.toUpperCase());
          const remainingWords = allWords.filter(w => !solvedWordsList.includes(w.toUpperCase()));
@@ -464,7 +485,6 @@ const WordGuessGame = () => {
           </div>
       )}
 
-      {/* 모바일 화면 맞춤을 위해 높이 제한 제거, 패딩/마진 축소 */}
       <div className="bg-white rounded-[2rem] p-4 w-full max-w-md shadow-2xl flex flex-col items-center border-t-8 border-indigo-500">
         
         {/* 상단바 */}
