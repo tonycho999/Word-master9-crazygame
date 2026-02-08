@@ -2,29 +2,36 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase, saveProgress } from '../supabase'; 
 import { Mail, X, Send, Key, ArrowLeft } from 'lucide-react';
 
+// Hooks
 import { useSound } from '../hooks/useSound';
 import { useAuthSystem } from '../hooks/useAuthSystem';
 import { useGameLogic } from '../hooks/useGameLogic';
 
+// Components
 import SyncConflictModal from './SyncConflictModal';
 import GameHeader from './GameHeader';
 import GameControls from './GameControls';
 import AnswerBoard from './AnswerBoard';
 
-const CURRENT_VERSION = '1.4.3';
+// ★ 버전을 올릴 때마다 이 값을 변경하세요 (사용자 폰에서 자동 업데이트 트리거됨)
+const CURRENT_VERSION = '1.4.5';
 
 const WordGuessGame = () => {
+  // [1] 기본 상태 (LocalStorage에서 불러오기)
   const [level, setLevel] = useState(() => Number(localStorage.getItem('word-game-level')) || 1);
   const [score, setScore] = useState(() => Number(localStorage.getItem('word-game-score')) || 300);
   
+  // Refs
   const levelRef = useRef(level);
   const scoreRef = useRef(score);
   useEffect(() => { levelRef.current = level; scoreRef.current = score; }, [level, score]);
 
+  // [2] 커스텀 훅 연결
   const playSound = useSound();
   const auth = useAuthSystem(playSound, levelRef, scoreRef, setLevel, setScore);
   const game = useGameLogic(playSound, level, score, setScore, auth.setMessage);
 
+  // [3] 로컬 UI 상태
   const [inputEmail, setInputEmail] = useState('');
   const [otp, setOtp] = useState(''); 
   const [isOtpSent, setIsOtpSent] = useState(false); 
@@ -33,37 +40,64 @@ const WordGuessGame = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [adClickCount, setAdClickCount] = useState(() => Number(localStorage.getItem('ad-click-count')) || 0);
   
-  // ★ [수정] 광고 쿨타임 타이머 상태 추가
+  // 광고 쿨타임 및 로딩 상태
   const [adCooldown, setAdCooldown] = useState(0);
   const [isAdLoading, setIsAdLoading] = useState(false);
+  const [isAdVisible, setIsAdVisible] = useState(true); // 호환성 유지
 
-  // 버전 체크 로직 (생략 - 기존 유지)
+  // ★ [핵심 복구] 버전 체크 및 강제 업데이트 로직
+  // 이 코드가 있어야 설치된 앱에서 자동으로 최신 버전으로 갱신됩니다.
   useEffect(() => {
     const checkVersion = async () => {
       const savedVersion = localStorage.getItem('game-version');
+      
+      // 저장된 버전과 현재 버전이 다르면? (업데이트 발생)
       if (savedVersion && savedVersion !== CURRENT_VERSION) {
-        if ('caches' in window) { try { const keys = await caches.keys(); await Promise.all(keys.map(key => caches.delete(key))); } catch (err) {} }
-        if ('serviceWorker' in navigator) { const registrations = await navigator.serviceWorker.getRegistrations(); for (const registration of registrations) { await registration.unregister(); } }
+        console.log(`🔄 업데이트 감지: v${savedVersion} -> v${CURRENT_VERSION}`);
+        
+        // 1. 캐시 스토리지(구버전 파일) 삭제 - 데이터는 안 지워짐
+        if ('caches' in window) {
+          try {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(key => caches.delete(key)));
+          } catch (err) {
+            console.error("Cache Clear Failed", err);
+          }
+        }
+
+        // 2. 서비스 워커 해제 (확실한 갱신)
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+          }
+        }
+
+        // 3. 새 버전 번호 저장 후 페이지 새로고침
         localStorage.setItem('game-version', CURRENT_VERSION);
-        window.location.reload(true);
+        alert("최신 버전으로 업데이트합니다! 🚀");
+        window.location.reload(true); // true = 서버에서 새로 받기
         return;
       }
+
+      // 버전이 같으면 현재 버전 유지
       localStorage.setItem('game-version', CURRENT_VERSION);
     };
+
     checkVersion();
   }, []);
 
-  // 자동 저장
+  // PWA 업데이트 감지 리스너 (index.js와 연동)
   useEffect(() => {
-    localStorage.setItem('word-game-level', level); 
-    localStorage.setItem('word-game-score', score);
-    if (auth.isOnline && auth.user && !auth.conflictData) { 
-        const timer = setTimeout(() => saveProgress(auth.user.id, level, score, auth.user.email), 1000); 
-        return () => clearTimeout(timer); 
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        console.log("🔄 서비스 워커 변경 감지! 자동 새로고침...");
+        window.location.reload();
+      });
     }
-  }, [level, score, auth.isOnline, auth.user, auth.conflictData]);
+  }, []);
 
-  // PWA & 광고 쿨타임 초기화 로직
+  // PWA 설치 프롬프트 및 광고 쿨타임 초기화
   useEffect(() => {
     const handleInstall = (e) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handleInstall);
@@ -71,10 +105,10 @@ const WordGuessGame = () => {
     const today = new Date().toLocaleDateString();
     if (localStorage.getItem('ad-click-date') !== today) { localStorage.setItem('ad-click-date', today); setAdClickCount(0); }
     
-    // 남은 시간 계산
+    // 남은 쿨타임 시간 계산
     const lastClickTime = Number(localStorage.getItem('ad-last-click-time')) || 0;
     const diffSeconds = Math.floor((Date.now() - lastClickTime) / 1000);
-    const cooldownTime = 10 * 60; // 10분 (600초)
+    const cooldownTime = 10 * 60; // 10분
 
     if (diffSeconds < cooldownTime) {
       setAdCooldown(cooldownTime - diffSeconds);
@@ -83,7 +117,7 @@ const WordGuessGame = () => {
     return () => window.removeEventListener('beforeinstallprompt', handleInstall);
   }, []);
 
-  // ★ [추가] 타이머 작동 로직
+  // 광고 타이머 작동 로직
   useEffect(() => {
     if (adCooldown > 0) {
       const timer = setInterval(() => {
@@ -96,27 +130,34 @@ const WordGuessGame = () => {
     }
   }, [adCooldown]);
 
-  // [수정] 광고 보상 함수 (타이머 적용)
+  // 자동 저장
+  useEffect(() => {
+    localStorage.setItem('word-game-level', level); 
+    localStorage.setItem('word-game-score', score);
+    if (auth.isOnline && auth.user && !auth.conflictData) { 
+        const timer = setTimeout(() => saveProgress(auth.user.id, level, score, auth.user.email), 1000); 
+        return () => clearTimeout(timer); 
+    }
+  }, [level, score, auth.isOnline, auth.user, auth.conflictData]);
+
+  // [4] 액션 핸들러
   const handleRewardAd = () => {
     if (!auth.isOnline) { auth.setMessage("Need Internet for Ads"); return; }
     if (adClickCount >= 10) return;
     
     playSound('click'); 
-    setIsAdLoading(true);
-    // 버튼을 숨기는 대신 로딩 중으로 변경
+    setIsAdLoading(true); // 로딩 시작
     
     setTimeout(async () => {
       const newScore = scoreRef.current + 200; 
       setScore(newScore); 
       setAdClickCount(c => c + 1); 
-      setIsAdLoading(false);
+      setIsAdLoading(false); // 로딩 끝
       
-      // 시간 저장 및 쿨타임 설정 (600초 = 10분)
-      const now = Date.now();
+      // 시간 저장 및 쿨타임 시작 (10분)
       localStorage.setItem('ad-click-count', (adClickCount + 1).toString()); 
-      localStorage.setItem('ad-last-click-time', now.toString());
-      
-      setAdCooldown(600); // ★ 10분 카운트 시작
+      localStorage.setItem('ad-last-click-time', Date.now().toString());
+      setAdCooldown(600); 
 
       playSound('reward'); 
       auth.setMessage('+200P Reward!'); 
@@ -130,21 +171,28 @@ const WordGuessGame = () => {
     playSound('click');
     const nextLevel = levelRef.current + 1; const nextScore = scoreRef.current + 50;
     setScore(nextScore); setLevel(nextLevel);
+    
+    // 게임 상태 초기화
     game.setCurrentWord(''); 
     game.setSolvedWords([]); 
+    
     if (auth.isOnline && auth.user) await saveProgress(auth.user.id, nextLevel, nextScore, auth.user.email);
   };
 
-  // OTP ... (기존과 동일)
+  // OTP 관련 함수들
   const handleSendOtp = async (e) => { e.preventDefault(); if (!inputEmail.includes('@')) return auth.setMessage('Invalid Email'); setIsLoading(true); playSound('click'); const { error } = await supabase.auth.signInWithOtp({ email: inputEmail }); setIsLoading(false); if (error) { auth.setMessage(error.message.includes('rate limit') ? 'Wait a moment...' : 'Error sending code'); } else { setIsOtpSent(true); auth.setMessage('Code sent to email!'); } setTimeout(() => auth.setMessage(''), 3000); };
   const handleVerifyOtp = async (e) => { e.preventDefault(); if (otp.length < 6) return auth.setMessage('Enter 6 digits'); setIsLoading(true); playSound('click'); const { error } = await supabase.auth.verifyOtp({ email: inputEmail, token: otp, type: 'email' }); setIsLoading(false); if (error) { auth.setMessage('Wrong Code. Try again.'); } else { auth.setMessage('LOGIN SUCCESS!'); auth.setShowLoginModal(false); setIsOtpSent(false); setOtp(''); } setTimeout(() => auth.setMessage(''), 3000); };
   const closeLoginModal = () => { auth.setShowLoginModal(false); setIsOtpSent(false); setOtp(''); setInputEmail(''); };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none relative">
+      
+      {/* JSON-LD SEO */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Word Master", "applicationCategory": "GameApplication", "operatingSystem": "Any", "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" }, "description": "Free online English word guess puzzle game." }) }} />
+
       <SyncConflictModal conflictData={auth.conflictData} currentLevel={level} currentScore={score} onResolve={auth.handleResolveConflict} />
 
+      {/* 로그인 모달 */}
       {auth.showLoginModal && (
           <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl p-6 max-w-xs w-full shadow-2xl animate-fade-in-up">
@@ -159,25 +207,41 @@ const WordGuessGame = () => {
           </div>
       )}
 
+      {/* 메인 게임 영역 */}
       <div className="bg-white rounded-[2rem] p-4 w-full max-w-md shadow-2xl flex flex-col items-center border-t-8 border-indigo-500">
-        <GameHeader level={level} score={score} user={auth.user} isOnline={auth.isOnline} onLogin={() => auth.setShowLoginModal(true)} onLogout={auth.handleLogout} showInstallBtn={!!deferredPrompt} onInstall={() => deferredPrompt?.prompt()} />
+        <GameHeader 
+            level={level} score={score} user={auth.user} isOnline={auth.isOnline} 
+            onLogin={() => auth.setShowLoginModal(true)} onLogout={auth.handleLogout} 
+            showInstallBtn={!!deferredPrompt} onInstall={() => deferredPrompt?.prompt()} 
+        />
         <GameControls 
             category={game.category} wordType={game.wordType} wordCountDisplay={`${game.currentWord.split(/\s+/).length} WORDS`}
             hintMessage={game.hintMessage} isCorrect={game.isCorrect} hintStage={game.hintStage}
-            hintButtonText={game.hintStage === 0 ? '1ST LETTER (100P)' : game.hintStage === 1 ? '1ST & LAST (200P)' : game.hintStage === 2 ? 'SHOW SPACES (300P)' : 'FLASH ANSWER (500P)'}
+            // 힌트 3단계 텍스트 변경 (SHOW SPACES -> SHOW STRUCTURE)
+            hintButtonText={game.hintStage === 0 ? '1ST LETTER (100P)' : game.hintStage === 1 ? '1ST & LAST (200P)' : game.hintStage === 2 ? 'SHOW STRUCTURE (300P)' : 'FLASH ANSWER (500P)'}
             onHint={game.handleHint} onShuffle={game.handleShuffle} 
-            isAdVisible={isAdVisible} isAdLoading={isAdLoading} adClickCount={adClickCount} onRewardAd={handleRewardAd} isOnline={auth.isOnline} 
-            adCooldown={adCooldown} // ★ adCooldown 전달
+            isAdVisible={isAdVisible} isAdLoading={isAdLoading} adClickCount={adClickCount} onRewardAd={handleRewardAd} isOnline={auth.isOnline}
+            adCooldown={adCooldown} // 타이머 시간 전달
             scrambledLetters={game.scrambledLetters} onLetterClick={game.handleLetterClick} onReset={game.handleReset} onBackspace={game.handleBackspace} onNextLevel={processNextLevel}
         >
-            <AnswerBoard currentWord={game.currentWord} solvedWords={game.solvedWords} selectedLetters={game.selectedLetters} isCorrect={game.isCorrect} isFlashing={game.isFlashing} hintStage={game.hintStage} message={auth.message} />
+            <AnswerBoard 
+                currentWord={game.currentWord} 
+                solvedWords={game.solvedWords} 
+                selectedLetters={game.selectedLetters} 
+                isCorrect={game.isCorrect} 
+                isFlashing={game.isFlashing} 
+                hintStage={game.hintStage} 
+                message={auth.message} 
+            />
         </GameControls>
       </div>
 
       {level === 1 && (
         <footer className="mt-8 text-center max-w-md mx-auto opacity-20 text-indigo-100 selection:bg-transparent pointer-events-none">
           <h1 className="text-[10px] font-bold mb-1">Word Master - Free Online English Word Guess Puzzle Game</h1>
-          <div className="flex justify-center gap-2 text-[8px] font-medium mb-1"><h2>English Vocabulary Training</h2><span>•</span><h2>Brain Teasers & Logic Puzzles</h2><span>•</span><h2>Wordle Style Gameplay</h2></div>
+          <div className="flex justify-center gap-2 text-[8px] font-medium mb-1">
+            <h2>English Vocabulary Training</h2><span>•</span><h2>Brain Teasers & Logic Puzzles</h2><span>•</span><h2>Wordle Style Gameplay</h2>
+          </div>
           <p className="text-[8px] leading-tight px-4">Play the best free word puzzle game online. Guess the hidden words, improve your English vocabulary, and challenge your brain with 1000+ levels.</p>
         </footer>
       )}
