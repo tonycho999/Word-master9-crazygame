@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://word-master9.vercel.app/sitemap.xml
