@@ -8,7 +8,7 @@ import { useAuthSystem } from '../hooks/useAuthSystem';
 import { useGameLogic } from '../hooks/useGameLogic';
 import { useAppVersion } from '../hooks/useAppVersion'; 
 
-// SEO (Helmet Async)
+// SEO
 import { Helmet } from 'react-helmet-async';
 
 // Components
@@ -124,11 +124,16 @@ const WordGuessGame = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none relative">
       
-      {/* ★ [수정됨] 에러 해결: 문자열 템플릿 사용 */}
+      {/* ★ [SEO] og-image.png 및 공유 설정 추가됨 */}
       <Helmet>
         <title>{`Word Master - Level ${level} (영어 단어 퍼즐)`}</title>
         <meta name="description" content={`Word Master Level ${level} 도전 중! 무료로 즐기는 영어 단어 퀴즈 게임입니다.`} />
-        <meta property="og:title" content={`Word Master - Lv.${level} 도전!`} />
+        
+        {/* SNS 공유 설정 */}
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={`🧠 Word Master - Lv.${level} 도전!`} />
+        <meta property="og:description" content="단어를 조립해서 퀴즈를 풀어보세요! 친구들은 몇 레벨까지 갈 수 있을까요?" />
+        <meta property="og:image" content="https://word-master9.vercel.app/og-image.png" />
       </Helmet>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "VideoGame", "name": "Word Master", "description": "Free English Word Puzzle", "genre": ["Puzzle", "Educational"], "playMode": "SinglePlayer", "applicationCategory": "Game", "operatingSystem": "Any", "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" }, "author": { "@type": "Person", "name": "Word Master Team" } }) }} />
@@ -164,7 +169,6 @@ const WordGuessGame = () => {
         </GameControls>
       </div>
 
-      {/* ★ [수정됨] Footer는 레벨 1에서만 보입니다. */}
       {level === 1 && (
         <footer className="mt-8 text-center max-w-md mx-auto opacity-20 text-indigo-100 selection:bg-transparent pointer-events-none">
           <h1 className="text-[10px] font-bold mb-1">Word Master</h1>
