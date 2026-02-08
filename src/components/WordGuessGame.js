@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, saveProgress } from '../supabase'; 
-// [수정] KeyRound 대신 호환성 좋은 Key 아이콘 사용
+// [수정] 호환성 좋은 Key 아이콘 사용
 import { Mail, X, Send, Key, ArrowLeft } from 'lucide-react';
 
 // Hooks 임포트
@@ -14,7 +14,7 @@ import GameHeader from './GameHeader';
 import GameControls from './GameControls';
 import AnswerBoard from './AnswerBoard';
 
-const CURRENT_VERSION = '1.4.1'; 
+const CURRENT_VERSION = '1.4.2'; // 버전 업 (자동 업데이트 트리거용)
 
 const WordGuessGame = () => {
   // [1] 기본 상태
@@ -52,6 +52,16 @@ const WordGuessGame = () => {
         return () => clearTimeout(timer); 
     }
   }, [level, score, auth.isOnline, auth.user, auth.conflictData]);
+
+  // ★ [중요] 새 버전 배포 시 사용자 브라우저 자동 새로고침 (재설치 불필요)
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        console.log("🔄 새 버전 발견! 자동 새로고침...");
+        window.location.reload();
+      });
+    }
+  }, []);
 
   // PWA & AD Cooldown
   useEffect(() => {
@@ -102,7 +112,7 @@ const WordGuessGame = () => {
         console.error(error);
         auth.setMessage(error.message.includes('rate limit') ? 'Wait a moment...' : 'Error sending code');
     } else {
-        setIsOtpSent(true); // 성공하면 무조건 화면 전환
+        setIsOtpSent(true); 
         auth.setMessage('Code sent to email!');
     }
     setTimeout(() => auth.setMessage(''), 3000);
