@@ -1,32 +1,8 @@
 import React from 'react';
-import { Wifi, WifiOff, LogIn, LogOut, Download, Coins, Share2 } from 'lucide-react';
+import { Wifi, WifiOff, LogIn, LogOut, Download, Coins } from 'lucide-react';
 
 const GameHeader = ({ level, score, user, isOnline, onLogin, onLogout, showInstallBtn, onInstall }) => {
   
-  // --- 소셜 공유 기능 ---
-  const handleShare = async () => {
-    const shareData = {
-      title: 'Word Master',
-      text: `Word Master에서 레벨 ${level} 도전 중! 🧠 너도 맞춰봐!`,
-      url: window.location.href,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        console.log('공유 취소됨');
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(window.location.href);
-        alert("링크가 복사되었습니다! 친구에게 전달해보세요. 📋");
-      } catch (err) {
-        alert("브라우저가 공유 기능을 지원하지 않습니다.");
-      }
-    }
-  };
-
   return (
     <div className="w-full flex justify-between items-center mb-6">
       
@@ -57,13 +33,7 @@ const GameHeader = ({ level, score, user, isOnline, onLogin, onLogout, showInsta
         {/* 2. 아랫줄: 버튼들 + 코인 */}
         <div className="flex items-center gap-2">
           
-          {/* 공유 버튼 */}
-          <button 
-            onClick={handleShare} 
-            className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded-lg text-xs font-black shadow-md transition-all active:scale-95"
-          >
-            <Share2 size={14} strokeWidth={3} /> SHARE
-          </button>
+          {/* 공유 버튼 삭제됨 */}
 
           {/* 앱 설치 버튼 */}
           {showInstallBtn && (
