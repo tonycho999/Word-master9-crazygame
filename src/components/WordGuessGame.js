@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, saveProgress } from '../supabase'; 
-import { Mail, X, Send, KeyRound, ArrowLeft } from 'lucide-react';
+// [수정] KeyRound 대신 호환성 좋은 Key 아이콘 사용
+import { Mail, X, Send, Key, ArrowLeft } from 'lucide-react';
 
 // Hooks 임포트
 import { useSound } from '../hooks/useSound';
@@ -13,7 +14,7 @@ import GameHeader from './GameHeader';
 import GameControls from './GameControls';
 import AnswerBoard from './AnswerBoard';
 
-const CURRENT_VERSION = '1.4.0'; 
+const CURRENT_VERSION = '1.4.1'; 
 
 const WordGuessGame = () => {
   // [1] 기본 상태
@@ -32,9 +33,9 @@ const WordGuessGame = () => {
 
   // [3] 로컬 상태 (로그인 UI 관련)
   const [inputEmail, setInputEmail] = useState('');
-  const [otp, setOtp] = useState(''); // OTP 입력값
-  const [isOtpSent, setIsOtpSent] = useState(false); // OTP 전송 여부 확인
-  const [isLoading, setIsLoading] = useState(false); // 로딩 상태 통합
+  const [otp, setOtp] = useState(''); 
+  const [isOtpSent, setIsOtpSent] = useState(false); 
+  const [isLoading, setIsLoading] = useState(false); 
   
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [adClickCount, setAdClickCount] = useState(() => Number(localStorage.getItem('ad-click-count')) || 0);
@@ -101,13 +102,13 @@ const WordGuessGame = () => {
         console.error(error);
         auth.setMessage(error.message.includes('rate limit') ? 'Wait a moment...' : 'Error sending code');
     } else {
-        setIsOtpSent(true); 
+        setIsOtpSent(true); // 성공하면 무조건 화면 전환
         auth.setMessage('Code sent to email!');
     }
     setTimeout(() => auth.setMessage(''), 3000);
   };
 
-  // OTP 검증(로그인 완료) 함수 - [수정됨: data 제거]
+  // OTP 검증(로그인 완료) 함수
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     if (otp.length < 6) return auth.setMessage('Enter 6 digits');
@@ -115,7 +116,6 @@ const WordGuessGame = () => {
     setIsLoading(true);
     playSound('click');
 
-    // 여기서 data를 지우고 error만 받도록 수정했습니다.
     const { error } = await supabase.auth.verifyOtp({
         email: inputEmail,
         token: otp,
@@ -154,7 +154,7 @@ const WordGuessGame = () => {
               <div className="bg-white rounded-2xl p-6 max-w-xs w-full shadow-2xl animate-fade-in-up">
                   <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xl font-black text-indigo-600 flex items-center gap-2">
-                        {isOtpSent ? <KeyRound size={24}/> : <Mail size={24}/>} 
+                        {isOtpSent ? <Key size={24}/> : <Mail size={24}/>} 
                         {isOtpSent ? 'VERIFY CODE' : 'LOGIN'}
                       </h3>
                       <button onClick={closeLoginModal}><X size={24}/></button>
@@ -186,7 +186,7 @@ const WordGuessGame = () => {
                           </p>
                           <input type="text" value={otp} onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))} placeholder="123456" className="w-full px-4 py-3 rounded-xl border-2 border-indigo-100 bg-white focus:border-indigo-500 outline-none font-black text-center text-2xl tracking-widest text-indigo-900" inputMode="numeric" autoFocus required />
                           <button type="submit" disabled={isLoading} className="w-full py-3 bg-green-600 text-white rounded-xl font-black flex items-center justify-center gap-2 hover:bg-green-700 disabled:opacity-50">
-                            {isLoading ? 'VERIFYING...' : 'VERIFY & LOGIN'} <KeyRound size={16}/>
+                            {isLoading ? 'VERIFYING...' : 'VERIFY & LOGIN'} <Key size={16}/>
                           </button>
                           <button type="button" onClick={() => { setIsOtpSent(false); setOtp(''); }} className="text-xs text-gray-400 font-bold flex items-center justify-center gap-1 hover:text-gray-600 mt-2">
                             <ArrowLeft size={12}/> Change Email
