@@ -8,7 +8,7 @@ import { useAuthSystem } from '../hooks/useAuthSystem';
 import { useGameLogic } from '../hooks/useGameLogic';
 import { useAppVersion } from '../hooks/useAppVersion'; 
 
-// SEO
+// SEO (Helmet Async)
 import { Helmet } from 'react-helmet-async';
 
 // Components
@@ -17,11 +17,11 @@ import GameHeader from './GameHeader';
 import GameControls from './GameControls';
 import AnswerBoard from './AnswerBoard';
 
-// 버전 1.4.8
-const CURRENT_VERSION = '1.4.8';
+// 버전
+const CURRENT_VERSION = '1.4.9';
 
 const WordGuessGame = () => {
-  // [1] 버전 체크 (전용 훅 사용)
+  // [1] 버전 체크
   const isUpdating = useAppVersion(CURRENT_VERSION);
 
   // [2] 기본 상태
@@ -110,7 +110,7 @@ const WordGuessGame = () => {
   const handleVerifyOtp = async (e) => { e.preventDefault(); if (otp.length < 6) return auth.setMessage('Enter 6 digits'); setIsLoading(true); playSound('click'); const { error } = await supabase.auth.verifyOtp({ email: inputEmail, token: otp, type: 'email' }); setIsLoading(false); if (error) { auth.setMessage('Wrong Code. Try again.'); } else { auth.setMessage('LOGIN SUCCESS!'); auth.setShowLoginModal(false); setIsOtpSent(false); setOtp(''); } setTimeout(() => auth.setMessage(''), 3000); };
   const closeLoginModal = () => { auth.setShowLoginModal(false); setIsOtpSent(false); setOtp(''); setInputEmail(''); };
 
-  // 업데이트 로딩 화면
+  // 업데이트 로딩
   if (isUpdating) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-indigo-600 text-white">
@@ -124,11 +124,11 @@ const WordGuessGame = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none relative">
       
-      {/* ★ [수정] title 태그 내부를 문자열 템플릿으로 감싸서 에러 해결 */}
+      {/* ★ [수정됨] 에러 해결: 문자열 템플릿 사용 */}
       <Helmet>
-        <title>{`Word Master - Level ${level}`}</title>
-        <meta name="description" content={`Level ${level} English Word Puzzle`} />
-        <meta property="og:title" content={`Word Master - Lv.${level}`} />
+        <title>{`Word Master - Level ${level} (영어 단어 퍼즐)`}</title>
+        <meta name="description" content={`Word Master Level ${level} 도전 중! 무료로 즐기는 영어 단어 퀴즈 게임입니다.`} />
+        <meta property="og:title" content={`Word Master - Lv.${level} 도전!`} />
       </Helmet>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "VideoGame", "name": "Word Master", "description": "Free English Word Puzzle", "genre": ["Puzzle", "Educational"], "playMode": "SinglePlayer", "applicationCategory": "Game", "operatingSystem": "Any", "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" }, "author": { "@type": "Person", "name": "Word Master Team" } }) }} />
@@ -164,6 +164,7 @@ const WordGuessGame = () => {
         </GameControls>
       </div>
 
+      {/* ★ [수정됨] Footer는 레벨 1에서만 보입니다. */}
       {level === 1 && (
         <footer className="mt-8 text-center max-w-md mx-auto opacity-20 text-indigo-100 selection:bg-transparent pointer-events-none">
           <h1 className="text-[10px] font-bold mb-1">Word Master</h1>
