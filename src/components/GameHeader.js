@@ -1,9 +1,9 @@
 import React from 'react';
-import { Wifi, WifiOff, LogIn, LogOut, Download, Coins, Share2 } from 'lucide-react'; // Share2 추가
+import { Wifi, WifiOff, LogIn, LogOut, Download, Coins, Share2 } from 'lucide-react';
 
 const GameHeader = ({ level, score, user, isOnline, onLogin, onLogout, showInstallBtn, onInstall }) => {
   
-  // --- 소셜 공유 기능 함수 ---
+  // --- 소셜 공유 기능 ---
   const handleShare = async () => {
     const shareData = {
       title: 'Word Master',
@@ -18,7 +18,6 @@ const GameHeader = ({ level, score, user, isOnline, onLogin, onLogout, showInsta
         console.log('공유 취소됨');
       }
     } else {
-      // PC 등 공유 기능 미지원 시 클립보드 복사
       try {
         await navigator.clipboard.writeText(window.location.href);
         alert("링크가 복사되었습니다! 친구에게 전달해보세요. 📋");
@@ -36,36 +35,37 @@ const GameHeader = ({ level, score, user, isOnline, onLogin, onLogout, showInsta
         LEVEL {level}
       </div>
 
-      {/* [오른쪽] 상태, 버튼, 코인 그룹 */}
+      {/* [오른쪽] 전체 그룹 (위: 정보 / 아래: 버튼들) */}
       <div className="flex flex-col items-end gap-1">
         
-        {/* 1. 이메일 주소 */}
-        {user && (
-          <span className="text-[10px] font-bold text-gray-400 tracking-wide">
-            {user.email}
-          </span>
-        )}
-
-        {/* 2. 아이콘 및 버튼 그룹 */}
-        <div className="flex items-center gap-2"> {/* gap을 3에서 2로 살짝 줄임 (버튼이 많아져서) */}
-          
-          {/* (1) 와이파이 아이콘 */}
-          {isOnline ? (
-            <Wifi size={18} className="text-green-500" strokeWidth={3} />
-          ) : (
-            <WifiOff size={18} className="text-red-400 animate-pulse" />
+        {/* 1. 윗줄: 이메일 + 와이파이 아이콘 */}
+        <div className="flex items-center gap-2 h-4"> {/* 높이 고정으로 레이아웃 흔들림 방지 */}
+          {user && (
+            <span className="text-[10px] font-bold text-gray-400 tracking-wide">
+              {user.email}
+            </span>
           )}
 
-          {/* (추가) 공유 버튼 */}
+          {/* 와이파이 아이콘 (항상 여기 위치) */}
+          {isOnline ? (
+            <Wifi size={16} className="text-green-500" strokeWidth={3} />
+          ) : (
+            <WifiOff size={16} className="text-red-400 animate-pulse" />
+          )}
+        </div>
+
+        {/* 2. 아랫줄: 버튼들 + 코인 */}
+        <div className="flex items-center gap-2">
+          
+          {/* 공유 버튼 */}
           <button 
             onClick={handleShare} 
             className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded-lg text-xs font-black shadow-md transition-all active:scale-95"
-            aria-label="공유하기"
           >
             <Share2 size={14} strokeWidth={3} /> SHARE
           </button>
 
-          {/* (2) 앱 설치 버튼 */}
+          {/* 앱 설치 버튼 */}
           {showInstallBtn && (
             <button 
               onClick={onInstall} 
@@ -75,7 +75,7 @@ const GameHeader = ({ level, score, user, isOnline, onLogin, onLogout, showInsta
             </button>
           )}
 
-          {/* (3) 로그인/로그아웃 버튼 */}
+          {/* 로그인/로그아웃 버튼 */}
           {user ? (
             <button 
               onClick={onLogout} 
@@ -93,7 +93,7 @@ const GameHeader = ({ level, score, user, isOnline, onLogin, onLogout, showInsta
             </button>
           )}
 
-          {/* (4) 코인 */}
+          {/* 코인 */}
           <div className="flex items-center gap-1 ml-1">
             <Coins size={20} className="text-yellow-500 fill-yellow-400" strokeWidth={2.5} />
             <span className="text-gray-800 font-black text-xl tracking-tight">
