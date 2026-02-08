@@ -11,8 +11,8 @@ const GameControls = ({
   return (
     <div className="w-full flex flex-col items-center">
       
-      {/* 1. 정보 표시 (카테고리 등) */}
-      <div className="flex items-center gap-2 mb-4">
+      {/* 1. 정보 표시 */}
+      <div className="flex items-center gap-2 mb-2">
         <span className="bg-gray-200 text-gray-600 px-2 py-1 rounded text-[10px] font-black tracking-widest uppercase">
           {wordCountDisplay}
         </span>
@@ -21,12 +21,12 @@ const GameControls = ({
         </span>
       </div>
 
-      <h2 className="text-2xl font-black text-gray-800 mb-1 tracking-tight uppercase text-center">
+      <h2 className="text-xl font-black text-gray-800 mb-1 tracking-tight uppercase text-center">
         {category}
       </h2>
 
       {/* 2. 힌트 메시지 */}
-      <div className="h-6 mb-2 flex items-center justify-center w-full">
+      <div className="h-6 mb-1 flex items-center justify-center w-full">
          {hintMessage && !isCorrect && (
            <span className="text-xs font-bold text-red-500 bg-red-50 px-3 py-1 rounded-full animate-pulse">
              {hintMessage}
@@ -34,10 +34,9 @@ const GameControls = ({
          )}
       </div>
 
-      {/* 3. 상단 기능 버튼들 (힌트, 셔플, 광고) - 정답 맞추면 숨김 */}
+      {/* 3. 상단 기능 버튼들 */}
       {!isCorrect && (
-        <div className="flex gap-2 w-full mb-4">
-           {/* 힌트 버튼 */}
+        <div className="flex gap-2 w-full mb-2">
            <button 
              onClick={onHint} 
              disabled={hintStage >= 4}
@@ -47,7 +46,6 @@ const GameControls = ({
              {hintButtonText}
            </button>
 
-           {/* 셔플 버튼 */}
            <button 
              onClick={onShuffle} 
              className="flex-1 bg-white border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-50 text-gray-700 py-3 rounded-xl font-black text-[10px] flex flex-col items-center justify-center gap-1 shadow-sm transition-all active:scale-95"
@@ -57,24 +55,23 @@ const GameControls = ({
         </div>
       )}
 
-      {/* 광고 버튼 (별도 로직 유지) */}
+      {/* 광고 버튼 */}
       {!isCorrect && isAdVisible && (
         <button 
           onClick={onRewardAd} disabled={!isOnline || isAdLoading}
-          className="w-full bg-amber-400 hover:bg-amber-500 text-white py-2 mb-4 rounded-xl font-black text-xs shadow-md shadow-amber-200 flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale"
+          className="w-full bg-amber-400 hover:bg-amber-500 text-white py-2 mb-2 rounded-xl font-black text-xs shadow-md shadow-amber-200 flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale"
         >
           {isAdLoading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/> : <Film size={16} fill="currentColor" />}
           WATCH AD (+200P) ({adClickCount}/10)
         </button>
       )}
 
-      {/* 4. 게임 보드 (AnswerBoard) 삽입 위치 */}
+      {/* 4. AnswerBoard (게임판) 위치 */}
       {children}
 
-      {/* 5. 하단 컨트롤 영역 */}
-      <div className="w-full mt-auto pt-4">
+      {/* 5. 하단 컨트롤 영역 (수정: mt-auto 제거 -> 바로 아래 붙음) */}
+      <div className="w-full mt-2"> 
         
-        {/* ★ 정답을 맞췄을 때: NEXT LEVEL 버튼만 표시 */}
         {isCorrect ? (
           <button
             onClick={onNextLevel}
@@ -83,10 +80,9 @@ const GameControls = ({
             NEXT LEVEL <Play size={24} fill="currentColor" />
           </button>
         ) : (
-          /* 정답 아닐 때: 키보드 컨트롤 표시 */
           <>
-            {/* 글자 버튼들 */}
-            <div className="grid grid-cols-6 gap-2 mb-4">
+            {/* 알파벳 버튼들 */}
+            <div className="grid grid-cols-6 gap-2 mb-3">
               {scrambledLetters.map((item) => (
                 <button
                   key={item.id}
@@ -98,7 +94,7 @@ const GameControls = ({
               ))}
             </div>
 
-            {/* 조작 버튼 (Reset, Back) */}
+            {/* 조작 버튼 */}
             <div className="flex gap-2">
               <button 
                 onClick={onReset} 
