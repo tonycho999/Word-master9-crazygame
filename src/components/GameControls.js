@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shuffle, Lightbulb, RotateCcw, Delete, Play, Film, Clock } from 'lucide-react';
+import { Shuffle, Lightbulb, RotateCcw, Delete, Play, Film, Clock, Share2 } from 'lucide-react';
 
 const GameControls = ({ 
   category, wordType, wordCountDisplay,
@@ -10,11 +10,31 @@ const GameControls = ({
   children 
 }) => {
   
-  // 시간 포맷 함수 (초 -> MM:SS)
+  // 시간 포맷 함수
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  // 공유하기 기능
+  const handleShare = async () => {
+    const shareData = {
+      title: 'Word Master',
+      text: 'Play Word Master - Free Online English Word Puzzle Game!',
+      url: window.location.href, // 현재 주소 공유
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData); // 모바일: 공유 시트
+      } else {
+        await navigator.clipboard.writeText(window.location.href); // PC: 클립보드 복사
+        alert('Game Link Copied!'); 
+      }
+    } catch (err) {
+      console.log('Error sharing:', err);
+    }
   };
 
   return (
@@ -25,12 +45,10 @@ const GameControls = ({
         <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase">
           {wordCountDisplay}
         </span>
-        
-        {/* ★ [수정] NORMAL은 파란색, PHRASE는 붉은색 배경 적용 */}
         <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase ${
           wordType === 'NORMAL' 
-            ? 'bg-blue-100 text-blue-600'  // Normal: 파란색
-            : 'bg-red-100 text-red-600'    // Phrase: 붉은색
+            ? 'bg-blue-100 text-blue-600'
+            : 'bg-red-100 text-red-600'
         }`}>
           {wordType}
         </span>
@@ -112,7 +130,7 @@ const GameControls = ({
         {children}
       </div>
 
-      {/* 8. 하단 컨트롤 (리셋/백) */}
+      {/* 8. 하단 컨트롤 영역 (Reset/Back + Share) */}
       <div className="w-full px-2"> 
         {isCorrect ? (
           <button
@@ -122,19 +140,32 @@ const GameControls = ({
             NEXT LEVEL <Play size={20} fill="currentColor" />
           </button>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
+            
+            {/* Reset & Back 버튼 */}
+            <div className="flex gap-2 w-full">
+                <button 
+                  onClick={onReset} 
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-600 py-2 rounded-lg font-black text-xs flex items-center justify-center gap-1 transition-colors active:scale-95"
+                >
+                  <RotateCcw size={14} strokeWidth={2.5} /> RESET
+                </button>
+                <button 
+                  onClick={onBackspace} 
+                  className="flex-[2] bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg font-black text-xs shadow-lg shadow-indigo-200 flex items-center justify-center gap-1 transition-all active:scale-95"
+                >
+                  <Delete size={16} fill="currentColor" /> BACK
+                </button>
+            </div>
+
+            {/* ★ Share Game 버튼 (녹색, 긴 버튼) */}
             <button 
-              onClick={onReset} 
-              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-600 py-2 rounded-lg font-black text-xs flex items-center justify-center gap-1 transition-colors active:scale-95"
+                onClick={handleShare}
+                className="w-full bg-teal-500 hover:bg-teal-600 text-white py-2 rounded-lg font-black text-xs shadow-md shadow-teal-200 flex items-center justify-center gap-2 transition-all active:scale-95"
             >
-              <RotateCcw size={14} strokeWidth={2.5} /> RESET
+                <Share2 size={16} fill="none" /> SHARE GAME
             </button>
-            <button 
-              onClick={onBackspace} 
-              className="flex-[2] bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg font-black text-xs shadow-lg shadow-indigo-200 flex items-center justify-center gap-1 transition-all active:scale-95"
-            >
-              <Delete size={16} fill="currentColor" /> BACK
-            </button>
+
           </div>
         )}
       </div>
