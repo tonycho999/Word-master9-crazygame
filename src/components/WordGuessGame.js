@@ -7,14 +7,18 @@ import { useSound } from '../hooks/useSound';
 import { useAuthSystem } from '../hooks/useAuthSystem';
 import { useGameLogic } from '../hooks/useGameLogic';
 
+// ★ [SEO] 여기에 추가합니다
+import { Helmet } from 'react-helmet-async';
+
 // Components
 import SyncConflictModal from './SyncConflictModal';
 import GameHeader from './GameHeader';
 import GameControls from './GameControls';
 import AnswerBoard from './AnswerBoard';
 
-// ★ 버전을 올릴 때마다 이 값을 변경하세요 (사용자 폰에서 자동 업데이트 트리거됨)
-const CURRENT_VERSION = '1.4.5';
+// ★ 버전을 올렸습니다 (1.4.5 -> 1.4.6)
+// package.json이 바뀌었으므로 캐시를 갱신하기 위함입니다.
+const CURRENT_VERSION = '1.4.6';
 
 const WordGuessGame = () => {
   // [1] 기본 상태 (LocalStorage에서 불러오기)
@@ -45,8 +49,7 @@ const WordGuessGame = () => {
   const [isAdLoading, setIsAdLoading] = useState(false);
   const [isAdVisible, setIsAdVisible] = useState(true); // 호환성 유지
 
-  // ★ [핵심 복구] 버전 체크 및 강제 업데이트 로직
-  // 이 코드가 있어야 설치된 앱에서 자동으로 최신 버전으로 갱신됩니다.
+  // ★ 버전 체크 및 강제 업데이트 로직
   useEffect(() => {
     const checkVersion = async () => {
       const savedVersion = localStorage.getItem('game-version');
@@ -55,7 +58,7 @@ const WordGuessGame = () => {
       if (savedVersion && savedVersion !== CURRENT_VERSION) {
         console.log(`🔄 업데이트 감지: v${savedVersion} -> v${CURRENT_VERSION}`);
         
-        // 1. 캐시 스토리지(구버전 파일) 삭제 - 데이터는 안 지워짐
+        // 1. 캐시 스토리지(구버전 파일) 삭제
         if ('caches' in window) {
           try {
             const keys = await caches.keys();
@@ -65,7 +68,7 @@ const WordGuessGame = () => {
           }
         }
 
-        // 2. 서비스 워커 해제 (확실한 갱신)
+        // 2. 서비스 워커 해제
         if ('serviceWorker' in navigator) {
           const registrations = await navigator.serviceWorker.getRegistrations();
           for (const registration of registrations) {
@@ -76,18 +79,17 @@ const WordGuessGame = () => {
         // 3. 새 버전 번호 저장 후 페이지 새로고침
         localStorage.setItem('game-version', CURRENT_VERSION);
         alert("최신 버전으로 업데이트합니다! 🚀");
-        window.location.reload(true); // true = 서버에서 새로 받기
+        window.location.reload(true); 
         return;
       }
 
-      // 버전이 같으면 현재 버전 유지
       localStorage.setItem('game-version', CURRENT_VERSION);
     };
 
     checkVersion();
   }, []);
 
-  // PWA 업데이트 감지 리스너 (index.js와 연동)
+  // PWA 업데이트 감지 리스너
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -105,7 +107,6 @@ const WordGuessGame = () => {
     const today = new Date().toLocaleDateString();
     if (localStorage.getItem('ad-click-date') !== today) { localStorage.setItem('ad-click-date', today); setAdClickCount(0); }
     
-    // 남은 쿨타임 시간 계산
     const lastClickTime = Number(localStorage.getItem('ad-last-click-time')) || 0;
     const diffSeconds = Math.floor((Date.now() - lastClickTime) / 1000);
     const cooldownTime = 10 * 60; // 10분
@@ -146,15 +147,14 @@ const WordGuessGame = () => {
     if (adClickCount >= 10) return;
     
     playSound('click'); 
-    setIsAdLoading(true); // 로딩 시작
+    setIsAdLoading(true); 
     
     setTimeout(async () => {
       const newScore = scoreRef.current + 200; 
       setScore(newScore); 
       setAdClickCount(c => c + 1); 
-      setIsAdLoading(false); // 로딩 끝
+      setIsAdLoading(false); 
       
-      // 시간 저장 및 쿨타임 시작 (10분)
       localStorage.setItem('ad-click-count', (adClickCount + 1).toString()); 
       localStorage.setItem('ad-last-click-time', Date.now().toString());
       setAdCooldown(600); 
@@ -172,7 +172,6 @@ const WordGuessGame = () => {
     const nextLevel = levelRef.current + 1; const nextScore = scoreRef.current + 50;
     setScore(nextScore); setLevel(nextLevel);
     
-    // 게임 상태 초기화
     game.setCurrentWord(''); 
     game.setSolvedWords([]); 
     
@@ -187,8 +186,15 @@ const WordGuessGame = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none relative">
       
-      {/* JSON-LD SEO */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Word Master", "applicationCategory": "GameApplication", "operatingSystem": "Any", "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" }, "description": "Free online English word guess puzzle game." }) }} />
+      {/* ★ [SEO] Helmet 적용: 레벨이 바뀔 때마다 탭 제목과 설명이 변경됩니다 */}
+      <Helmet>
+        <title>Word Master - Level {level} (영어 단어 퍼즐)</title>
+        <meta name="description" content={`Word Master Level ${level} 도전 중! 무료로 즐기는 영어 단어 퀴즈 게임입니다. 어휘력을 테스트해보세요.`} />
+        <meta property="og:title" content={`Word Master - Lv.${level} 도전!`} />
+      </Helmet>
+
+      {/* JSON-LD 구조화 데이터 */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "VideoGame", "name": "Word Master", "description": "영어 어휘력 향상을 위한 무료 단어 추리 퍼즐 게임입니다.", "genre": ["Puzzle", "Educational", "Word Game"], "playMode": "SinglePlayer", "applicationCategory": "GameApplication", "operatingSystem": "Any", "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW", "availability": "https://schema.org/InStock" }, "author": { "@type": "Person", "name": "Word Master Team" } }) }} />
 
       <SyncConflictModal conflictData={auth.conflictData} currentLevel={level} currentScore={score} onResolve={auth.handleResolveConflict} />
 
@@ -220,7 +226,7 @@ const WordGuessGame = () => {
             // 힌트 3단계 텍스트 변경 (SHOW SPACES -> SHOW STRUCTURE)
             hintButtonText={game.hintStage === 0 ? '1ST LETTER (100P)' : game.hintStage === 1 ? '1ST & LAST (200P)' : game.hintStage === 2 ? 'SHOW STRUCTURE (300P)' : 'FLASH ANSWER (500P)'}
             onHint={game.handleHint} onShuffle={game.handleShuffle} 
-            isAdVisible={isAdVisible} isAdLoading={isAdLoading} adClickCount={adClickCount} onRewardAd={handleRewardAd} isOnline={auth.isOnline}
+            isAdVisible={isAdVisible} isAdLoading={isAdLoading} adClickCount={adClickCount} onRewardAd={handleRewardAd} isOnline={auth.isOnline} 
             adCooldown={adCooldown} // 타이머 시간 전달
             scrambledLetters={game.scrambledLetters} onLetterClick={game.handleLetterClick} onReset={game.handleReset} onBackspace={game.handleBackspace} onNextLevel={processNextLevel}
         >
