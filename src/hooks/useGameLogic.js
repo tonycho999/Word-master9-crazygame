@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { wordDatabase, twoWordDatabase, threeWordDatabase, fourWordDatabase, fiveWordDatabase, LEVEL_CONFIG } from '../data/wordDatabase';
+// LEVEL_CONFIG는 이제 쓰지 않고, 직접 로직을 짰습니다.
+import { wordDatabase, twoWordDatabase, threeWordDatabase, fourWordDatabase, fiveWordDatabase } from '../data/wordDatabase';
 
 export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
   const [currentWord, setCurrentWord] = useState(() => localStorage.getItem('word-game-current-word') || '');
@@ -14,39 +15,68 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
   const [hintMessage, setHintMessage] = useState(() => localStorage.getItem('word-game-hint-message') || '');
   const [isFlashing, setIsFlashing] = useState(false);
 
-  // 레벨별 고정 단어 로드 (확률 설정 적용)
+  // [핵심] 레벨별 단어 개수 패턴 로직
   const loadNewWord = useCallback(() => {
-    const config = (LEVEL_CONFIG && LEVEL_CONFIG.find(c => level <= c.maxLevel)) || LEVEL_CONFIG[LEVEL_CONFIG.length - 1];
     
-    // 레벨에 따른 고정 확률값 생성
-    const deterministicRandom = (level * 37) % 100; 
-
-    let cumProb = 0;
     let targetWordCount = 1;
 
-    if (config && config.probs) {
-        for (const [count, prob] of Object.entries(config.probs)) {
-            cumProb += prob;
-            if (deterministicRandom < cumProb) {
-                targetWordCount = Number(count);
-                break;
-            }
-        }
+    // ★ 요청하신 레벨별 패턴 설정
+    if (level <= 5) {
+      // 1 ~ 5: 1단어 고정
+      targetWordCount = 1;
+    } 
+    else if (level <= 9) {
+      // 6 ~ 9: 2단어 고정
+      targetWordCount = 2;
+    } 
+    else if (level <= 19) {
+      // 10 ~ 19: 1, 2 반복
+      const pattern = [1, 2];
+      targetWordCount = pattern[(level - 10) % pattern.length];
+    } 
+    else if (level <= 50) {
+      // 20 ~ 50: 1, 2, 2, 3, 2, 2...
+      const pattern = [1, 2, 2, 3, 2, 2];
+      targetWordCount = pattern[(level - 20) % pattern.length];
+    } 
+    else if (level <= 100) {
+      // 51 ~ 100: 1, 2, 3, 2, 3, 2, 3...
+      const pattern = [1, 2, 3, 2, 3, 2, 3];
+      targetWordCount = pattern[(level - 51) % pattern.length];
+    } 
+    else if (level <= 300) {
+      // 101 ~ 300: 1, 2, 3, 4, 3, 3, 2...
+      const pattern = [1, 2, 3, 4, 3, 3, 2];
+      targetWordCount = pattern[(level - 101) % pattern.length];
+    } 
+    else if (level <= 700) {
+      // 301 ~ 700: 2, 3, 2, 4, 3, 2, 3, 4...
+      const pattern = [2, 3, 2, 4, 3, 2, 3, 4];
+      targetWordCount = pattern[(level - 301) % pattern.length];
+    } 
+    else {
+      // 701 이상: 2, 3, 4, 3, 4, 5, 4, 3...
+      const pattern = [2, 3, 4, 3, 4, 5, 4, 3];
+      targetWordCount = pattern[(level - 701) % pattern.length];
     }
-    
+
+    // 결정된 개수에 따라 DB 선택
     let targetPool = wordDatabase;
     if (targetWordCount === 2) targetPool = twoWordDatabase;
     else if (targetWordCount === 3) targetPool = threeWordDatabase;
     else if (targetWordCount === 4) targetPool = fourWordDatabase;
     else if (targetWordCount === 5) targetPool = fiveWordDatabase;
 
+    // 해당 DB에서 순서대로 단어 가져오기
     const fixedIndex = (level - 1) % targetPool.length;
     const selectedPick = targetPool[fixedIndex] || targetPool[0];
     
+    // 상태 초기화
     setCurrentWord(selectedPick.word);
     setCategory(selectedPick.category);
     setWordType(selectedPick.type ? selectedPick.type.toUpperCase() : 'NORMAL');
     
+    // 알파벳 섞기
     const chars = selectedPick.word.replace(/\s/g, '')
       .split('')
       .map((char, i) => ({ char, id: `l-${Date.now()}-${i}-${Math.random()}` }))
@@ -60,15 +90,17 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
     setHintMessage('');
     setIsFlashing(false);
     
-    console.log(`🔒 [고정 단어 로드] Level: ${level}, Words: ${selectedPick.word.split(' ').length}`);
+    console.log(`🔒 [패턴 로드] Level: ${level}, Words: ${selectedPick.word.split(' ').length} (Target: ${targetWordCount})`);
   }, [level]);
 
+  // 새로고침 시 유지
   useEffect(() => {
     if (!currentWord) {
       loadNewWord();
     }
   }, [level, loadNewWord, currentWord]); 
 
+  // 정답 체크
   useEffect(() => {
     if (!currentWord) return;
 
@@ -92,7 +124,7 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
     }
   }, [selectedLetters, currentWord, solvedWords, playSound]);
 
-  // [수정된 부분] 힌트 처리
+  // 힌트 처리
   const handleHint = () => {
     playSound('click'); 
     if (isCorrect) return;
@@ -121,7 +153,6 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
         cost = 500; 
         setIsFlashing(true); 
         playSound('flash'); 
-        // ★ [수정] 깜빡임 시간 0.8초 (800ms)로 단축
         setTimeout(() => setIsFlashing(false), 800); 
         return; 
     }
@@ -129,11 +160,7 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
     if (score >= cost) { 
         setScore(s => s - cost); 
         setHintStage(nextStage); 
-        
-        if (msg) {
-            setHintMessage(msg); 
-            // ★ [수정] setMessage(msg) 삭제 -> 상단 토스트 팝업에는 안 뜸
-        }
+        if (msg) setHintMessage(msg); 
     }
     else { 
         setMessage(`Need ${cost} Points!`); 
@@ -146,6 +173,7 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
   const handleReset = () => { playSound('click'); setScrambledLetters(p => [...p, ...selectedLetters]); setSelectedLetters([]); };
   const handleBackspace = () => { if(selectedLetters.length > 0) { playSound('click'); const last = selectedLetters[selectedLetters.length-1]; setSelectedLetters(p => p.slice(0, -1)); setScrambledLetters(p => [...p, last]); } };
 
+  // 자동 저장
   useEffect(() => {
     localStorage.setItem('word-game-current-word', currentWord); 
     localStorage.setItem('word-game-category', category);
