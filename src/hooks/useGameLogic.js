@@ -13,12 +13,10 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
   const [hintMessage, setHintMessage] = useState(() => localStorage.getItem('word-game-hint-message') || '');
   const [isFlashing, setIsFlashing] = useState(false);
 
-  // [핵심 수정 1] 레벨에 맞는 단어를 불러오는 함수
+  // 레벨에 맞는 단어를 불러오는 함수
   const loadNewWord = useCallback(() => {
-    // 확률 설정 가져오기
     const config = (LEVEL_CONFIG && LEVEL_CONFIG.find(c => level <= c.maxLevel)) || LEVEL_CONFIG[LEVEL_CONFIG.length - 1];
     
-    // 단어 개수 뽑기 (확률 기반)
     const rand = Math.random() * 100; 
     let cumProb = 0; 
     let targetWordCount = 1;
@@ -27,19 +25,16 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
         if (rand < cumProb) { targetWordCount = Number(count); break; } 
     }
     
-    // DB 선택
     let targetPool = wordDatabase;
     if (targetWordCount === 2) targetPool = twoWordDatabase; 
     else if (targetWordCount === 3) targetPool = threeWordDatabase; 
     else if (targetWordCount === 4) targetPool = fourWordDatabase; 
     else if (targetWordCount === 5) targetPool = fiveWordDatabase;
     
-    // 레벨에 따른 고정 인덱스 (매직 넘버 활용)
     const magicNumber = 17; 
     const fixedIndex = ((level * magicNumber)) % targetPool.length; 
     const selectedPick = targetPool[fixedIndex] || wordDatabase[0];
     
-    // 상태 업데이트
     setCurrentWord(selectedPick.word); 
     setCategory(selectedPick.category); 
     setWordType(selectedPick.type ? selectedPick.type.toUpperCase() : 'NORMAL');
@@ -55,15 +50,12 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
     setIsFlashing(false);
     
     console.log(`🆕 [새 단어 로드] Level: ${level}, Word: ${selectedPick.word}`);
-  }, [level]); // ★중요★ level이 바뀔 때만 이 함수가 재생성됨
+  }, [level]);
 
-  // [핵심 수정 2] 초기 실행 및 "레벨 변경 시" 자동 실행
   useEffect(() => {
-    // 단어가 없거나, 레벨이 바뀌었을 때 실행
     loadNewWord();
   }, [level, loadNewWord]); 
 
-  // 정답 체크 (변경 없음)
   useEffect(() => {
     if (!currentWord) return;
     const enteredStr = selectedLetters.map(l => l.char).join('').toUpperCase();
@@ -79,18 +71,54 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
     }
   }, [selectedLetters, currentWord, solvedWordsData, playSound]);
 
-  // 힌트 처리 (변경 없음)
+  // [수정된 부분] 힌트 처리 함수
   const handleHint = () => {
-    playSound('click'); if (isCorrect) return;
-    const words = currentWord.split(' '); let cost = 0; let msg = ''; let nextStage = hintStage;
-    
-    if (hintStage === 0) { cost = 100; msg = `HINT: ${words.map(w => w[0].toUpperCase() + '...').join(' / ')}`; nextStage = 1; }
-    else if (hintStage === 1) { cost = 200; msg = `HINT: ${words.map(w => w.length > 1 ? w[0].toUpperCase() + '...' + w[w.length-1].toUpperCase() : w[0]).join(' / ')}`; nextStage = 2; }
-    else if (hintStage === 2) { cost = 300; msg = "WORD STRUCTURE REVEALED!"; nextStage = 3; }
-    else { cost = 500; setIsFlashing(true); playSound('flash'); setTimeout(() => setIsFlashing(false), 500); return; }
+    playSound('click'); 
+    if (isCorrect) return;
 
-    if (score >= cost) { setScore(s => s - cost); setHintStage(nextStage); if(msg) setHintMessage(msg); if(hintStage === 2) setMessage(msg); }
-    else { setMessage(`Need ${cost} Points!`); setTimeout(() => setMessage(''), 1500); }
+    const words = currentWord.split(' '); 
+    let cost = 0; 
+    let msg = ''; 
+    let nextStage = hintStage;
+    
+    if (hintStage === 0) { 
+        cost = 100; 
+        msg = `HINT: ${words.map(w => w[0].toUpperCase() + '...').join(' / ')}`; 
+        nextStage = 1; 
+    }
+    else if (hintStage === 1) { 
+        cost = 200; 
+        msg = `HINT: ${words.map(w => w.length > 1 ? w[0].toUpperCase() + '...' + w[w.length-1].toUpperCase() : w[0]).join(' / ')}`; 
+        nextStage = 2; 
+    }
+    else if (hintStage === 2) { 
+        cost = 300; 
+        msg = ""; // [수정] 메시지를 비워둠 ("WORD STRUCTURE REVEALED!" 제거)
+        nextStage = 3; 
+    }
+    else { 
+        cost = 500; 
+        setIsFlashing(true); 
+        playSound('flash'); 
+        setTimeout(() => setIsFlashing(false), 500); 
+        return; 
+    }
+
+    if (score >= cost) { 
+        setScore(s => s - cost); 
+        setHintStage(nextStage); 
+        
+        // [수정] msg가 있을 때만 힌트 메시지 업데이트 및 알림 표시
+        if (msg) {
+            setHintMessage(msg); 
+            // 2단계(3번째 힌트)에서는 msg가 비어있으므로 setMessage가 실행되지 않음
+            if (hintStage !== 2) setMessage(msg); 
+        }
+    }
+    else { 
+        setMessage(`Need ${cost} Points!`); 
+        setTimeout(() => setMessage(''), 1500); 
+    }
   };
 
   const handleShuffle = () => { playSound('click'); setScrambledLetters(prev => [...prev].sort(() => Math.random() - 0.5)); };
@@ -98,7 +126,6 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
   const handleReset = () => { playSound('click'); setScrambledLetters(p => [...p, ...selectedLetters]); setSelectedLetters([]); };
   const handleBackspace = () => { if(selectedLetters.length > 0) { playSound('click'); const last = selectedLetters[selectedLetters.length-1]; setSelectedLetters(p => p.slice(0, -1)); setScrambledLetters(p => [...p, last]); } };
 
-  // 자동 저장
   useEffect(() => {
     localStorage.setItem('word-game-current-word', currentWord); localStorage.setItem('word-game-category', category);
     localStorage.setItem('word-game-word-type', wordType); localStorage.setItem('word-game-scrambled', JSON.stringify(scrambledLetters));
@@ -109,6 +136,6 @@ export const useGameLogic = (playSound, level, score, setScore, setMessage) => {
   return {
     currentWord, category, wordType, scrambledLetters, selectedLetters, solvedWordsData, isCorrect, hintStage, hintMessage, isFlashing,
     setScrambledLetters, setSelectedLetters, setSolvedWordsData, setIsCorrect, setHintStage, setHintMessage, setCurrentWord,
-    handleHint, handleShuffle, handleLetterClick, handleReset, handleBackspace, loadNewWord // loadNewWord 내보냄
+    handleHint, handleShuffle, handleLetterClick, handleReset, handleBackspace, loadNewWord
   };
 };
