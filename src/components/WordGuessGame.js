@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, saveProgress } from '../supabase'; 
-// ★ [수정] ArrowLeft 추가 (에러 해결)
 import { Mail, X, Send, Key, ArrowLeft } from 'lucide-react';
 
 // Hooks
@@ -18,7 +17,7 @@ import GameHeader from './GameHeader';
 import GameControls from './GameControls';
 import AnswerBoard from './AnswerBoard';
 
-// 버전 1.4.8 (빌드 성공 시 적용됨)
+// 버전 1.4.8
 const CURRENT_VERSION = '1.4.8';
 
 const WordGuessGame = () => {
@@ -125,8 +124,9 @@ const WordGuessGame = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none relative">
       
+      {/* ★ [수정] title 태그 내부를 문자열 템플릿으로 감싸서 에러 해결 */}
       <Helmet>
-        <title>Word Master - Level {level}</title>
+        <title>{`Word Master - Level ${level}`}</title>
         <meta name="description" content={`Level ${level} English Word Puzzle`} />
         <meta property="og:title" content={`Word Master - Lv.${level}`} />
       </Helmet>
