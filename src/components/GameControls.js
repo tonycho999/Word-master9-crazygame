@@ -38,7 +38,6 @@ const GameControls = ({
       {/* 4. 힌트 & 셔플 버튼 */}
       {!isCorrect && (
         <div className="flex gap-2 w-full mb-2">
-           {/* 힌트 버튼 */}
            <button 
              onClick={onHint} 
              disabled={hintStage >= 4}
@@ -48,7 +47,6 @@ const GameControls = ({
              {hintButtonText}
            </button>
 
-           {/* 셔플 버튼 */}
            <button 
              onClick={onShuffle} 
              className="flex-1 bg-white border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-50 text-gray-700 h-9 rounded-lg font-black text-[10px] flex items-center justify-center gap-1 shadow-sm transition-all active:scale-95"
@@ -69,8 +67,30 @@ const GameControls = ({
         </button>
       )}
 
-      {/* 6. 알파벳 버튼 영역 (★위치 이동: 광고 버튼 바로 아래) */}
-      <div className="w-full mb-4"> 
+      {/* 6. 알파벳 버튼 영역 (광고 버튼 바로 아래) */}
+      {!isCorrect && (
+        <div className="w-full mb-4">
+          <div className="grid grid-cols-6 gap-1.5">
+            {scrambledLetters.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => onLetterClick(item)}
+                className="aspect-square bg-white border-b-2 border-gray-200 active:border-b-0 active:translate-y-0.5 text-gray-800 font-black text-base rounded-lg shadow-sm hover:bg-gray-50 transition-all flex items-center justify-center"
+              >
+                {item.char}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 7. AnswerBoard (게임판 - 정답 칸) */}
+      <div className="w-full mb-4">
+        {children}
+      </div>
+
+      {/* 8. 하단 컨트롤 영역 (리셋/백 - 정답 칸 아래) */}
+      <div className="w-full"> 
         {isCorrect ? (
           <button
             onClick={onNextLevel}
@@ -79,41 +99,22 @@ const GameControls = ({
             NEXT LEVEL <Play size={20} fill="currentColor" />
           </button>
         ) : (
-          <>
-            {/* 알파벳 그리드 */}
-            <div className="grid grid-cols-6 gap-1.5 mb-2">
-              {scrambledLetters.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => onLetterClick(item)}
-                  className="aspect-square bg-white border-b-2 border-gray-200 active:border-b-0 active:translate-y-0.5 text-gray-800 font-black text-base rounded-lg shadow-sm hover:bg-gray-50 transition-all flex items-center justify-center"
-                >
-                  {item.char}
-                </button>
-              ))}
-            </div>
-
-            {/* 하단 조작 버튼 (Reset, Back) */}
-            <div className="flex gap-2">
-              <button 
-                onClick={onReset} 
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-600 py-2 rounded-lg font-black text-xs flex items-center justify-center gap-1 transition-colors active:scale-95"
-              >
-                <RotateCcw size={14} strokeWidth={2.5} /> RESET
-              </button>
-              <button 
-                onClick={onBackspace} 
-                className="flex-[2] bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg font-black text-xs shadow-lg shadow-indigo-200 flex items-center justify-center gap-1 transition-all active:scale-95"
-              >
-                <Delete size={16} fill="currentColor" /> BACK
-              </button>
-            </div>
-          </>
+          <div className="flex gap-2">
+            <button 
+              onClick={onReset} 
+              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-600 py-2 rounded-lg font-black text-xs flex items-center justify-center gap-1 transition-colors active:scale-95"
+            >
+              <RotateCcw size={14} strokeWidth={2.5} /> RESET
+            </button>
+            <button 
+              onClick={onBackspace} 
+              className="flex-[2] bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg font-black text-xs shadow-lg shadow-indigo-200 flex items-center justify-center gap-1 transition-all active:scale-95"
+            >
+              <Delete size={16} fill="currentColor" /> BACK
+            </button>
+          </div>
         )}
       </div>
-
-      {/* 7. AnswerBoard (게임판) (★위치 이동: 맨 아래) */}
-      {children}
 
     </div>
   );
