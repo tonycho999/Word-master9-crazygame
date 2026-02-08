@@ -14,7 +14,7 @@ import GameHeader from './GameHeader';
 import GameControls from './GameControls';
 import AnswerBoard from './AnswerBoard';
 
-const CURRENT_VERSION = '1.4.2'; // 버전 업 (자동 업데이트 트리거용)
+const CURRENT_VERSION = '1.4.2'; // 버전 업
 
 const WordGuessGame = () => {
   // [1] 기본 상태
@@ -53,7 +53,7 @@ const WordGuessGame = () => {
     }
   }, [level, score, auth.isOnline, auth.user, auth.conflictData]);
 
-  // ★ [중요] 새 버전 배포 시 사용자 브라우저 자동 새로고침 (재설치 불필요)
+  // ★ 새 버전 배포 시 사용자 브라우저 자동 새로고침
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -156,6 +156,27 @@ const WordGuessGame = () => {
   // --- [5] 렌더링 ---
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-indigo-600 p-4 font-sans text-gray-900 select-none relative">
+      
+      {/* ★ [SEO 1] 구조화된 데이터 (JSON-LD) 추가 */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "Word Master",
+            "applicationCategory": "GameApplication",
+            "operatingSystem": "Any",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "KRW"
+            },
+            "description": "Free online English word guess puzzle game. Improve vocabulary and train your brain."
+          })
+        }}
+      />
+
       <SyncConflictModal conflictData={auth.conflictData} currentLevel={level} currentScore={score} onResolve={auth.handleResolveConflict} />
 
       {/* OTP 로그인 모달 */}
@@ -218,6 +239,32 @@ const WordGuessGame = () => {
             <AnswerBoard currentWord={game.currentWord} solvedWordsData={game.solvedWordsData} selectedLetters={game.selectedLetters} isCorrect={game.isCorrect} isFlashing={game.isFlashing} hintStage={game.hintStage} message={auth.message} />
         </GameControls>
       </div>
+
+      {/* ★ [SEO 2] 레벨 1일 때만 하단에 흐릿하게 게임 소개 텍스트 표시 */}
+      {level === 1 && (
+        <footer className="mt-8 text-center max-w-md mx-auto opacity-20 text-indigo-100 selection:bg-transparent pointer-events-none">
+          {/* h1: 가장 중요한 제목 */}
+          <h1 className="text-[10px] font-bold mb-1">
+            Word Master - Free Online English Word Guess Puzzle Game
+          </h1>
+          
+          {/* h2: 부제목들 */}
+          <div className="flex justify-center gap-2 text-[8px] font-medium mb-1">
+            <h2>English Vocabulary Training</h2>
+            <span>•</span>
+            <h2>Brain Teasers & Logic Puzzles</h2>
+            <span>•</span>
+            <h2>Wordle Style Gameplay</h2>
+          </div>
+
+          {/* 본문: 설명 텍스트 */}
+          <p className="text-[8px] leading-tight px-4">
+            Play the best free word puzzle game online. Guess the hidden words, improve your English vocabulary, and challenge your brain with 1000+ levels. 
+            Perfect for daily brain training and learning new words. No download required for web play.
+          </p>
+        </footer>
+      )}
+
     </div>
   );
 };
