@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, saveProgress } from '../supabase'; 
-import { Mail, X, Send, Key } from 'lucide-react';
+// ★ [수정] ArrowLeft 추가 (에러 해결)
+import { Mail, X, Send, Key, ArrowLeft } from 'lucide-react';
 
 // Hooks
 import { useSound } from '../hooks/useSound';
 import { useAuthSystem } from '../hooks/useAuthSystem';
 import { useGameLogic } from '../hooks/useGameLogic';
-import { useAppVersion } from '../hooks/useAppVersion'; // ★ 새로 만든 훅 임포트
+import { useAppVersion } from '../hooks/useAppVersion'; 
 
 // SEO
 import { Helmet } from 'react-helmet-async';
@@ -17,11 +18,11 @@ import GameHeader from './GameHeader';
 import GameControls from './GameControls';
 import AnswerBoard from './AnswerBoard';
 
-// ★ 버전을 여기만 고치면 됩니다 (현재: 1.4.8)
+// 버전 1.4.8 (빌드 성공 시 적용됨)
 const CURRENT_VERSION = '1.4.8';
 
 const WordGuessGame = () => {
-  // [1] 버전 체크 및 업데이트 (여기서 모든 걸 처리함)
+  // [1] 버전 체크 (전용 훅 사용)
   const isUpdating = useAppVersion(CURRENT_VERSION);
 
   // [2] 기본 상태
@@ -110,7 +111,7 @@ const WordGuessGame = () => {
   const handleVerifyOtp = async (e) => { e.preventDefault(); if (otp.length < 6) return auth.setMessage('Enter 6 digits'); setIsLoading(true); playSound('click'); const { error } = await supabase.auth.verifyOtp({ email: inputEmail, token: otp, type: 'email' }); setIsLoading(false); if (error) { auth.setMessage('Wrong Code. Try again.'); } else { auth.setMessage('LOGIN SUCCESS!'); auth.setShowLoginModal(false); setIsOtpSent(false); setOtp(''); } setTimeout(() => auth.setMessage(''), 3000); };
   const closeLoginModal = () => { auth.setShowLoginModal(false); setIsOtpSent(false); setOtp(''); setInputEmail(''); };
 
-  // ★ 업데이트 중이면 게임 화면 대신 로딩 화면을 보여줍니다 (충돌 방지)
+  // 업데이트 로딩 화면
   if (isUpdating) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-indigo-600 text-white">
