@@ -107,7 +107,8 @@ const AdButtonComponent = ({ onReward }) => {
         className="bg-yellow-400 hover:bg-yellow-500 text-indigo-900 font-black py-3 px-6 rounded-full shadow-lg transition-transform active:scale-95 flex items-center gap-2 animate-pulse"
       >
         <span>📺</span>
-        <span>GET HINT ({MAX_DAILY_CLICKS - clickCount} left)</span>
+        {/* ★ 여기를 수정했습니다 (GET HINT -> GET 200 COINS) */}
+        <span>GET 200 COINS ({MAX_DAILY_CLICKS - clickCount} left)</span>
       </button>
     </div>
   );
