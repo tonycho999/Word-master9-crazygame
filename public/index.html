@@ -13,12 +13,10 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-0TY9QW80LY');
       </script>
     
     <link rel="canonical" href="https://word-master9.vercel.app/" />
-    
     <meta name="google-site-verification" content="DH63NsFaoB_Vb_mnoq8fNircDFilQwQ5a_nnCYSEiL4" />
     
     <meta property="og:image" content="https://word-master9.vercel.app/og-image.png" />
@@ -57,7 +55,6 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      /* 배경색이 잘리는 것을 방지하기 위한 강제 스타일 */
       body, html, #root {
         margin: 0;
         padding: 0;
@@ -68,16 +65,5 @@
   </head>
   <body>
     <div id="root"></div>
-
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          // 등록 경로를 명확히 지정
-          navigator.serviceWorker.register('/service-worker.js')
-            .then(reg => console.log('SW Registered'))
-            .catch(err => console.error('SW Registration Failed', err));
-        });
-      }
-    </script>
-  </body>
+    </body>
 </html>
