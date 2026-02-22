@@ -1,5 +1,5 @@
 // ★ [중요] 배포할 때마다 이 버전을 바꿔주세요! (예: v1 -> v2 -> v3 ...)
-const CACHE_NAME = 'word-master-v1.4.1'; 
+const CACHE_NAME = 'word-master-v1.4.2'; 
 
 const FILES_TO_CACHE = [
   '/',
