@@ -5,10 +5,8 @@ import App from './App';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import { HelmetProvider } from 'react-helmet-async';
 
-// 1. 헬멧 컨텍스트 명시 (에러 방지용)
 const helmetContext = {};
 
-// 2. 에러가 나면 흰 화면 대신 에러 메시지를 보여주는 부품 (에러 경계)
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -19,7 +17,6 @@ class ErrorBoundary extends React.Component {
   }
   render() {
     if (this.state.hasError) {
-      // 에러 발생 시 이 화면이 뜹니다
       return (
         <div style={{ padding: 20, color: 'red', wordBreak: 'break-all' }}>
           <h1>💥 앱 실행 중 오류 발생</h1>
@@ -34,14 +31,29 @@ class ErrorBoundary extends React.Component {
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
 root.render(
-  // 3. StrictMode 제거 (버전 체크 로직 충돌 방지)
-  // <React.StrictMode>  <-- 이거 때문에 폰에서 꼬일 수 있어서 뺍니다.
     <ErrorBoundary>
       <HelmetProvider context={helmetContext}>
         <App />
       </HelmetProvider>
     </ErrorBoundary>
-  // </React.StrictMode>
 );
 
-serviceWorkerRegistration.register();
+// ▼▼▼ [수정된 부분] 업데이트 감지 로직 추가 ▼▼▼
+serviceWorkerRegistration.register({
+  onUpdate: registration => {
+    // 새 서비스 워커가 대기 중(waiting)이면
+    const waitingServiceWorker = registration.waiting;
+    if (waitingServiceWorker) {
+      // 1. 새 워커에게 즉시 활성화하라는 메시지 전송
+      waitingServiceWorker.postMessage({ type: 'SKIP_WAITING' });
+
+      // 2. 상태가 'activated'로 변하면 화면 새로고침
+      waitingServiceWorker.addEventListener("statechange", event => {
+        if (event.target.state === "activated") {
+          window.location.reload();
+        }
+      });
+    }
+  },
+});
+// ▲▲▲ [수정 끝] ▲▲▲
