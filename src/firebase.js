@@ -4,7 +4,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDQT1f2RnrVtYFG3xTxqNiWeTDicwyQpSg",
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
   authDomain: "word-master9-crazygame.firebaseapp.com",
   projectId: "word-master9-crazygame",
   storageBucket: "word-master9-crazygame.firebasestorage.app",
